@@ -1,21 +1,821 @@
 // use prisma-next
+// Digital Metrology — Prisma 8/PostgreSQL contract
+// Active application schema.
+//
+// Design notes
+// - IDs are UUID strings and timestamps are PostgreSQL timestamptz strings, matching
+//   Prisma 8's contract surface.
+// - `Attachment` intentionally replaces the former document/photo/evidence tables.
+// - PostgreSQL CHECK constraints protect the mutually-exclusive relationships that
+//   are otherwise easy to violate through a nullable-FK schema.
 
-model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  username  String?
-  name      String?
-  posts     Post[]
-  createdAt TimestamptzString @default(now())
-  updatedAt temporal.updatedAtString()
+enum RoleName {
+  @@type("pg/text@1")
+
+  INSTRUMENT_OWNER = "INSTRUMENT_OWNER"
+  LMO              = "LMO"
+  DISTRICT_ADMIN   = "DISTRICT_ADMIN"
+  STATE_ADMIN      = "STATE_ADMIN"
+  DEPARTMENT_OFFICIAL = "DEPARTMENT_OFFICIAL"
+  SYSTEM_ADMIN     = "SYSTEM_ADMIN"
 }
 
-model Post {
-  id        Int      @id @default(autoincrement())
-  title     String
-  content   String?
-  author    User     @relation(fields: [authorId], references: [id])
-  authorId  Int
-  createdAt TimestamptzString @default(now())
+enum GatcRole {
+  @@type("pg/text@1")
+
+  MANAGER  = "MANAGER"
+  OPERATOR = "OPERATOR"
+}
+
+enum AdministrativeUnitType {
+  @@type("pg/text@1")
+
+  STATE    = "STATE"
+  DISTRICT = "DISTRICT"
+  TEHSIL   = "TEHSIL"
+  VILLAGE  = "VILLAGE"
+}
+
+enum ApplicationType {
+  @@type("pg/text@1")
+
+  INITIAL_VERIFICATION       = "INITIAL_VERIFICATION"
+  RE_VERIFICATION            = "RE_VERIFICATION"
+  POST_REPAIR_VERIFICATION   = "POST_REPAIR_VERIFICATION"
+  RELOCATION_RE_VERIFICATION = "RELOCATION_RE_VERIFICATION"
+  OWNERSHIP_TRANSFER         = "OWNERSHIP_TRANSFER"
+  CERTIFICATE_CORRECTION     = "CERTIFICATE_CORRECTION"
+  DUPLICATE_CERTIFICATE      = "DUPLICATE_CERTIFICATE"
+}
+
+enum ApplicationStatus {
+  @@type("pg/text@1")
+
+  DRAFT                    = "DRAFT"
+  SUBMITTED                = "SUBMITTED"
+  UNDER_REVIEW             = "UNDER_REVIEW"
+  DOCUMENTS_REQUIRED       = "DOCUMENTS_REQUIRED"
+  APPROVED                 = "APPROVED"
+  SCHEDULED                = "SCHEDULED"
+  VERIFICATION_IN_PROGRESS = "VERIFICATION_IN_PROGRESS"
+  PASSED                   = "PASSED"
+  FAILED                   = "FAILED"
+  CERTIFICATE_GENERATED    = "CERTIFICATE_GENERATED"
+  REJECTED                 = "REJECTED"
+  CANCELLED                = "CANCELLED"
+}
+
+enum VerificationRoute {
+  @@type("pg/text@1")
+
+  LMO  = "LMO"
+  GATC = "GATC"
+}
+
+enum Priority {
+  @@type("pg/text@1")
+
+  LOW    = "LOW"
+  MEDIUM = "MEDIUM"
+  HIGH   = "HIGH"
+}
+
+enum InstrumentStatus {
+  @@type("pg/text@1")
+
+  REGISTERED           = "REGISTERED"
+  PENDING_VERIFICATION = "PENDING_VERIFICATION"
+  VERIFIED             = "VERIFIED"
+  EXPIRING_SOON        = "EXPIRING_SOON"
+  EXPIRED              = "EXPIRED"
+  INACTIVE             = "INACTIVE"
+}
+
+enum InspectionResult {
+  @@type("pg/text@1")
+
+  PASS = "PASS"
+  FAIL = "FAIL"
+}
+
+enum AttachmentKind {
+  @@type("pg/text@1")
+
+  PREVIOUS_CERTIFICATE = "PREVIOUS_CERTIFICATE"
+  PURCHASE_DOCUMENT    = "PURCHASE_DOCUMENT"
+  APPROVAL_DOCUMENT    = "APPROVAL_DOCUMENT"
+  INSTRUMENT_FRONT     = "INSTRUMENT_FRONT"
+  SERIAL_NUMBER        = "SERIAL_NUMBER"
+  NAMEPLATE            = "NAMEPLATE"
+  CONDITION            = "CONDITION"
+  VERIFICATION_AREA    = "VERIFICATION_AREA"
+  TEST_SETUP           = "TEST_SETUP"
+  INSPECTION_VIDEO     = "INSPECTION_VIDEO"
+  INSPECTION_REPORT    = "INSPECTION_REPORT"
+  CERTIFICATE_CORRECTION_EVIDENCE = "CERTIFICATE_CORRECTION_EVIDENCE"
+  OTHER                = "OTHER"
+}
+
+enum CertificateStatus {
+  @@type("pg/text@1")
+
+  ACTIVE        = "ACTIVE"
+  EXPIRING_SOON = "EXPIRING_SOON"
+  EXPIRED       = "EXPIRED"
+  SUSPENDED     = "SUSPENDED"
+  CANCELLED     = "CANCELLED"
+  REVOKED       = "REVOKED"
+  SUPERSEDED    = "SUPERSEDED"
+}
+
+enum InspectionTemplateItemKind {
+  @@type("pg/text@1")
+
+  CHECKLIST   = "CHECKLIST"
+  NUMERIC     = "NUMERIC"
+  TEXT        = "TEXT"
+  SELECT      = "SELECT"
+  MEASUREMENT = "MEASUREMENT"
+}
+
+enum InspectionObservationSeverity {
+  @@type("pg/text@1")
+
+  INFO           = "INFO"
+  MINOR          = "MINOR"
+  MAJOR          = "MAJOR"
+  NON_COMPLIANCE = "NON_COMPLIANCE"
+}
+
+enum NotificationChannel {
+  @@type("pg/text@1")
+
+  IN_APP = "IN_APP"
+  EMAIL  = "EMAIL"
+  SMS    = "SMS"
+}
+
+enum NotificationStatus {
+  @@type("pg/text@1")
+
+  PENDING = "PENDING"
+  SENT    = "SENT"
+  FAILED  = "FAILED"
+}
+
+model User {
+  id           String            @id @default(uuid())
+  email        String            @unique
+  passwordHash String?           // null until an invited user sets a password
+  fullName     String
+  phone        String?
+  isActive     Boolean           @default(true)
+  invitedAt    TimestamptzString?
+  createdAt    TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
+
+  roles                 UserRole[]
+  business              Business?
+  lmoProfile            Lmo?
+  gatcMemberships       GatcMembership[]
+  adminScopes           AdminScope[]
+  uploadedFiles         FileObject[]                   @relation("FileUploader")
+  statusChanges         ApplicationStatusHistory[]     @relation("StatusChangedBy")
+  assignedWork          WorkOrder[]                    @relation("WorkAssignedBy")
+  performedInspections  Inspection[]                   @relation("InspectionPerformedBy")
+  finalizedInspections  Inspection[]                   @relation("InspectionFinalizedBy")
+  certificateStatusChanges CertificateStatusHistory[]  @relation("CertificateStatusChangedBy")
+  capturedAttachments   Attachment[]                   @relation("AttachmentCapturedBy")
+  auditLogs             AuditLog[]                     @relation("AuditActor")
+  notifications         Notification[]
+}
+
+// Global roles only. Centre-scoped authority is held by GatcMembership, not duplicated here.
+model UserRole {
+  id     String   @id @default(uuid())
+  userId String
+  role   RoleName
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([userId, role])
+}
+
+model AdministrativeUnit {
+  id        String                 @id @default(uuid())
+  name      String
+  type      AdministrativeUnitType
+  parentId  String?
+  latitude  Decimal?
+  longitude Decimal?
+
+  parent   AdministrativeUnit?  @relation("UnitHierarchy", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  children AdministrativeUnit[] @relation("UnitHierarchy")
+
+  instrumentLocations Instrument[] @relation("InstrumentLocationUnit")
+  lmoBases            Lmo[]        @relation("LmoBaseUnit")
+  lmoJurisdictions    LmoJurisdiction[]
+  gatcLocations       Gatc[]       @relation("GatcLocationUnit")
+  gatcServiceAreas    GatcServiceArea[]
+  adminScopes         AdminScope[]
+  instrumentLocationHistory InstrumentLocationHistory[]
+
+  @@unique([parentId, type, name])
+  @@index([type, parentId])
+}
+
+// A scope may be a state or a district. The service layer verifies which level
+// each admin role may receive; DEPARTMENT_OFFICIAL has national read scope.
+model AdminScope {
+  id                   String @id @default(uuid())
+  userId               String
+  administrativeUnitId String
+
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  administrativeUnit AdministrativeUnit @relation(fields: [administrativeUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([userId, administrativeUnitId])
+  @@index([administrativeUnitId])
+}
+
+model Business {
+  id                 String            @id @default(uuid())
+  userId             String            @unique
+  businessName       String
+  registrationNumber String?
+  contactPhone       String
+  contactEmail       String
+  createdAt          TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  instruments Instrument[]
+  ownershipHistory InstrumentOwnershipHistory[]
+}
+
+model Lmo {
+  id                       String            @id @default(uuid())
+  userId                   String            @unique
+  employeeId               String            @unique
+  designation              String
+  baseAdministrativeUnitId String?
+  baseLatitude             Decimal?
+  baseLongitude            Decimal?
+  isActive                 Boolean           @default(true)
+  createdAt                TimestamptzString @default(now())
+
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  baseUnit      AdministrativeUnit? @relation("LmoBaseUnit", fields: [baseAdministrativeUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  expertise     LmoInstrumentType[]
+  jurisdictions LmoJurisdiction[]
+  workOrders    WorkOrder[]
+  inspections   Inspection[]
+
+  @@index([baseAdministrativeUnitId])
+}
+
+// Replaces the old String[] expertise field: Prisma 8/Postgres contracts require a join model.
+model LmoInstrumentType {
+  id               String @id @default(uuid())
+  lmoId            String
+  instrumentTypeId String
+
+  lmo            Lmo            @relation(fields: [lmoId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  instrumentType InstrumentType @relation(fields: [instrumentTypeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([lmoId, instrumentTypeId])
+  @@index([instrumentTypeId])
+}
+
+model LmoJurisdiction {
+  id                   String @id @default(uuid())
+  lmoId                String
+  administrativeUnitId String
+
+  lmo                Lmo                @relation(fields: [lmoId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  administrativeUnit AdministrativeUnit @relation(fields: [administrativeUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([lmoId, administrativeUnitId])
+  @@index([administrativeUnitId])
+}
+
+model Gatc {
+  id                   String            @id @default(uuid())
+  legalName            String
+  approvalNumber       String            @unique
+  approvalValidFrom    TimestamptzString
+  approvalValidUntil   TimestamptzString
+  address              String
+  administrativeUnitId String
+  latitude             Decimal?
+  longitude            Decimal?
+  isActive             Boolean           @default(true)
+  createdAt            TimestamptzString @default(now())
+
+  administrativeUnit AdministrativeUnit    @relation("GatcLocationUnit", fields: [administrativeUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  authorizations     GatcAuthorization[]
+  serviceAreas       GatcServiceArea[]
+  staff              GatcMembership[]
+  workOrders         WorkOrder[]
+  inspections        Inspection[]
+
+  @@index([administrativeUnitId])
+}
+
+model GatcAuthorization {
+  id               String            @id @default(uuid())
+  gatcId           String
+  instrumentTypeId String
+  validFrom        TimestamptzString
+  validUntil       TimestamptzString
+
+  gatc           Gatc           @relation(fields: [gatcId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  instrumentType InstrumentType @relation(fields: [instrumentTypeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([gatcId, instrumentTypeId])
+  @@index([instrumentTypeId])
+}
+
+model GatcServiceArea {
+  id                   String @id @default(uuid())
+  gatcId               String
+  administrativeUnitId String
+
+  gatc               Gatc               @relation(fields: [gatcId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  administrativeUnit AdministrativeUnit @relation(fields: [administrativeUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([gatcId, administrativeUnitId])
+  @@index([administrativeUnitId])
+}
+
+model GatcMembership {
+  id       String   @id @default(uuid())
+  gatcId   String
+  userId   String
+  role     GatcRole
+  isActive Boolean  @default(true)
+
+  gatc Gatc @relation(fields: [gatcId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([gatcId, userId])
+  @@index([userId])
+}
+
+model InstrumentType {
+  id   String @id @default(uuid())
+  code String @unique
+  name String
+  unit String // kg, litre, etc.
+
+  instruments        Instrument[]
+  lmoExpertise       LmoInstrumentType[]
+  gatcAuthorizations GatcAuthorization[]
+  regulatoryRules    RegulatoryRule[]
+  inspectionTemplates InspectionTemplate[]
+}
+
+model Instrument {
+  id                   String            @id @default(uuid())
+  instrumentCode       String            @unique // permanent Digital Metrology Identity
+  instrumentTypeId     String
+  businessId           String
+  manufacturer         String
+  model                String
+  serialNumber         String
+  yearOfManufacture    Int?
+  purchaseDate         TimestamptzString?
+  capacity             Decimal?
+  accuracyClass        String?
+  status               InstrumentStatus  @default(REGISTERED)
+  address              String
+  administrativeUnitId String
+  postalCode           String?
+  latitude             Decimal?
+  longitude            Decimal?
+  createdAt            TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+
+  instrumentType     InstrumentType     @relation(fields: [instrumentTypeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  business           Business           @relation(fields: [businessId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  administrativeUnit AdministrativeUnit @relation("InstrumentLocationUnit", fields: [administrativeUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  attachments        Attachment[]
+  applications       Application[]
+  certificates       Certificate[]
+  ownershipHistory   InstrumentOwnershipHistory[]
+  locationHistory    InstrumentLocationHistory[]
+
+  @@unique([instrumentTypeId, manufacturer, serialNumber])
+  @@index([businessId])
+  @@index([administrativeUnitId])
+  @@index([status])
+}
+
+model FileObject {
+  id           String            @id @default(uuid())
+  bucket       String
+  objectKey    String            @unique
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  sha256       String?
+  metadata     Json?
+  uploadedById String
+  createdAt    TimestamptzString @default(now())
+
+  uploadedBy   User         @relation("FileUploader", fields: [uploadedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  attachments  Attachment[]
+  certificates Certificate[]
+
+  @@index([uploadedById])
+}
+
+// A single attachment table keeps the demo small while retaining real FKs and evidence metadata.
+model Attachment {
+  id            String            @id @default(uuid())
+  fileId        String            @unique
+  instrumentId  String?
+  applicationId String?
+  inspectionId  String?
+  kind          AttachmentKind
+  capturedAt    TimestamptzString?
+  capturedById  String?
+  latitude      Decimal?
+  longitude     Decimal?
+  createdAt     TimestamptzString @default(now())
+
+  file        FileObject   @relation(fields: [fileId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  instrument  Instrument?  @relation(fields: [instrumentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  application Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  inspection  Inspection?  @relation(fields: [inspectionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  capturedBy  User?        @relation("AttachmentCapturedBy", fields: [capturedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@check(expression: "((\"instrumentId\" IS NOT NULL)::int + (\"applicationId\" IS NOT NULL)::int + (\"inspectionId\" IS NOT NULL)::int) = 1", name: "attachment_one_owner")
+  @@index([instrumentId])
+  @@index([applicationId])
+  @@index([inspectionId])
+  @@index([capturedById])
+}
+
+model Application {
+  id              String            @id @default(uuid())
+  applicationCode String            @unique
+  instrumentId    String
+  type            ApplicationType
+  status          ApplicationStatus @default(DRAFT)
+  route           VerificationRoute?
+  priority        Priority          @default(MEDIUM)
+  targetCertificateId String?
+  requestedChanges Json?
+  preferredStartAt TimestamptzString?
+  preferredEndAt   TimestamptzString?
+  submittedAt     TimestamptzString?
+  createdAt       TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+
+  instrument    Instrument                 @relation(fields: [instrumentId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  attachments   Attachment[]
+  statusHistory ApplicationStatusHistory[]
+  workOrder     WorkOrder?
+  inspection    Inspection?
+  certificate   Certificate?
+  targetCertificate Certificate? @relation("ApplicationTargetCertificate", fields: [targetCertificateId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ownershipHistory InstrumentOwnershipHistory?
+  locationHistory InstrumentLocationHistory?
+
+  @@check(expression: "\"preferredStartAt\" IS NULL OR \"preferredEndAt\" IS NULL OR \"preferredStartAt\" < \"preferredEndAt\"", name: "application_preferred_window")
+  @@index([status])
+  @@index([instrumentId, createdAt])
+  @@index([targetCertificateId])
+}
+
+model ApplicationStatusHistory {
+  id            String            @id @default(uuid())
+  applicationId String
+  fromStatus    ApplicationStatus?
+  toStatus      ApplicationStatus
+  changedById   String?
+  reason        String?
+  createdAt     TimestamptzString @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  changedBy   User?       @relation("StatusChangedBy", fields: [changedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([applicationId, createdAt])
+  @@index([changedById])
+}
+
+// A work order combines assignment and scheduling: an application has at most one active order.
+model WorkOrder {
+  id               String            @id @default(uuid())
+  applicationId    String            @unique
+  route            VerificationRoute
+  lmoId            String?
+  gatcId           String?
+  recommendedScore Decimal?
+  wasOverridden    Boolean           @default(false)
+  assignedById     String
+  assignedAt       TimestamptzString @default(now())
+  scheduledStartAt TimestamptzString?
+  scheduledEndAt   TimestamptzString?
+  location         String?
+  createdAt        TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  lmo         Lmo?        @relation(fields: [lmoId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  gatc        Gatc?       @relation(fields: [gatcId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  assignedBy  User        @relation("WorkAssignedBy", fields: [assignedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@check(expression: "(\"lmoId\" IS NOT NULL AND \"gatcId\" IS NULL) OR (\"lmoId\" IS NULL AND \"gatcId\" IS NOT NULL)", name: "work_order_one_assignee")
+  @@check(expression: "(\"route\" = 'LMO' AND \"lmoId\" IS NOT NULL) OR (\"route\" = 'GATC' AND \"gatcId\" IS NOT NULL)", name: "work_order_route_matches_assignee")
+  @@check(expression: "\"scheduledStartAt\" IS NULL OR \"scheduledEndAt\" IS NULL OR \"scheduledStartAt\" < \"scheduledEndAt\"", name: "work_order_schedule_window")
+  @@index([lmoId, scheduledStartAt])
+  @@index([gatcId, scheduledStartAt])
+  @@index([assignedById])
+}
+
+model Inspection {
+  id            String            @id @default(uuid())
+  applicationId String            @unique
+  lmoId         String?
+  gatcId        String?
+  performedById String            // LMO or the actual GATC operator, never just the centre
+  startedAt     TimestamptzString?
+  submittedAt   TimestamptzString?
+  finalizedAt   TimestamptzString?
+  finalizedById String?
+  result        InspectionResult?
+  ruleVersionId String?
+  templateId    String?
+  notes         String?
+  createdAt     TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+
+  application  Application             @relation(fields: [applicationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  lmo          Lmo?                    @relation(fields: [lmoId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  gatc         Gatc?                   @relation(fields: [gatcId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  performedBy  User                    @relation("InspectionPerformedBy", fields: [performedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  finalizedBy  User?                   @relation("InspectionFinalizedBy", fields: [finalizedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ruleVersion  RegulatoryRule?         @relation(fields: [ruleVersionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  template     InspectionTemplate?     @relation(fields: [templateId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  measurements InspectionMeasurement[]
+  responses    InspectionTemplateResponse[]
+  observations InspectionObservation[]
+  attachments  Attachment[]
+
+  @@check(expression: "(\"lmoId\" IS NOT NULL AND \"gatcId\" IS NULL) OR (\"lmoId\" IS NULL AND \"gatcId\" IS NOT NULL)", name: "inspection_one_authority")
+  @@index([lmoId])
+  @@index([gatcId])
+  @@index([performedById])
+  @@index([finalizedById])
+  @@index([templateId])
+}
+
+model InspectionMeasurement {
+  id               String  @id @default(uuid())
+  inspectionId     String
+  sequence         Int
+  code             String
+  label            String
+  unit             String?
+  standardValue    Decimal
+  observedValue    Decimal
+  permissibleError Decimal
+  observedError    Decimal
+  withinLimit      Boolean
+  metadata         Json?
+
+  inspection Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([inspectionId, sequence])
+  @@index([inspectionId, code])
+}
+
+// Versioned, category-specific web forms. `validation` is schema/configuration
+// JSON; the service validates every response against the retained template version.
+model InspectionTemplate {
+  id               String            @id @default(uuid())
+  instrumentTypeId String
+  code             String
+  name             String
+  version          Int
+  effectiveFrom    TimestamptzString
+  effectiveUntil   TimestamptzString?
+  isActive         Boolean           @default(true)
+  createdAt        TimestamptzString @default(now())
+
+  instrumentType InstrumentType            @relation(fields: [instrumentTypeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  items          InspectionTemplateItem[]
+  inspections    Inspection[]
+
+  @@unique([instrumentTypeId, code, version])
+  @@index([instrumentTypeId, isActive, effectiveFrom], name: "inspection_tpl_current")
+}
+
+model InspectionTemplateItem {
+  id           String                     @id @default(uuid())
+  templateId   String
+  code         String
+  label        String
+  kind         InspectionTemplateItemKind
+  unit         String?
+  isRequired   Boolean                    @default(false)
+  displayOrder Int
+  validation   Json?
+  createdAt    TimestamptzString          @default(now())
+
+  template  InspectionTemplate           @relation(fields: [templateId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  responses InspectionTemplateResponse[]
+
+  @@unique([templateId, code])
+  @@unique([templateId, displayOrder])
+}
+
+model InspectionTemplateResponse {
+  id             String            @id @default(uuid())
+  inspectionId   String
+  templateItemId String
+  value          Json
+  isCompliant    Boolean?
+  remarks        String?
+  createdAt      TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+
+  inspection   Inspection             @relation(fields: [inspectionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  templateItem InspectionTemplateItem @relation(fields: [templateItemId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([inspectionId, templateItemId])
+  @@index([templateItemId])
+}
+
+model InspectionObservation {
+  id           String                        @id @default(uuid())
+  inspectionId String
+  code         String?
+  label        String
+  severity     InspectionObservationSeverity @default(INFO)
+  isCompliant  Boolean?
+  remarks      String
+  createdAt    TimestamptzString             @default(now())
+
+  inspection Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([inspectionId, severity])
+}
+
+model RegulatoryRule {
+  id                       String            @id @default(uuid())
+  instrumentTypeId         String
+  accuracyClass            String
+  capacityMin              Decimal
+  capacityMax              Decimal
+  permissibleError         Decimal
+  verificationPeriodMonths Int
+  effectiveFrom            TimestamptzString
+  effectiveUntil           TimestamptzString?
+
+  instrumentType InstrumentType @relation(fields: [instrumentTypeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  inspections    Inspection[]
+  certificates   Certificate[]
+
+  @@check(expression: "\"capacityMin\" <= \"capacityMax\"", name: "rule_capacity_range")
+  @@check(expression: "\"permissibleError\" >= 0", name: "rule_non_negative_error")
+  @@check(expression: "\"verificationPeriodMonths\" > 0", name: "rule_positive_period")
+  @@index([instrumentTypeId, accuracyClass, effectiveFrom], name: "rule_match")
+}
+
+model Certificate {
+  id              String            @id @default(uuid())
+  certificateCode String            @unique
+  applicationId   String            @unique
+  instrumentId    String
+  ruleVersionId   String?
+  fileId          String?           @unique
+  payloadHash     String            @unique // SHA-256 of the canonical certificate payload
+  verifiedAt      TimestamptzString
+  validUntil      TimestamptzString
+  status          CertificateStatus @default(ACTIVE)
+  createdAt       TimestamptzString @default(now())
+
+  application   Application               @relation(fields: [applicationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  instrument    Instrument                @relation(fields: [instrumentId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ruleVersion   RegulatoryRule?           @relation(fields: [ruleVersionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  file          FileObject?               @relation(fields: [fileId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  verifications CertificateVerification[]
+  notifications Notification[]
+  statusHistory CertificateStatusHistory[]
+  serviceRequests Application[] @relation("ApplicationTargetCertificate")
+
+  @@check(expression: "\"validUntil\" > \"verifiedAt\"", name: "certificate_validity_range")
+  @@index([instrumentId, validUntil])
+  @@index([status, validUntil])
+}
+
+model CertificateStatusHistory {
+  id            String            @id @default(uuid())
+  certificateId String
+  fromStatus    CertificateStatus?
+  toStatus      CertificateStatus
+  changedById   String?
+  reason        String?
+  createdAt     TimestamptzString @default(now())
+
+  certificate Certificate @relation(fields: [certificateId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  changedBy   User?       @relation("CertificateStatusChangedBy", fields: [changedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([certificateId, createdAt])
+}
+
+model CertificateVerification {
+  id            String            @id @default(uuid())
+  certificateId String
+  ipAddress     String?
+  presentedPayloadHash String?
+  matched       Boolean
+  checkedAt     TimestamptzString @default(now())
+
+  certificate Certificate @relation(fields: [certificateId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([certificateId, checkedAt])
+}
+
+// Current owner/location remain on Instrument for fast reads. These tables keep
+// approved transfer and relocation history without creating a new instrument ID.
+model InstrumentOwnershipHistory {
+  id            String            @id @default(uuid())
+  instrumentId  String
+  businessId    String
+  applicationId String?           @unique
+  effectiveFrom TimestamptzString
+  effectiveUntil TimestamptzString?
+
+  instrument  Instrument   @relation(fields: [instrumentId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  business    Business     @relation(fields: [businessId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  application Application? @relation(fields: [applicationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@check(expression: "\"effectiveUntil\" IS NULL OR \"effectiveFrom\" < \"effectiveUntil\"", name: "ownership_history_window")
+  @@index([instrumentId, effectiveFrom], name: "instrument_owner_history")
+}
+
+model InstrumentLocationHistory {
+  id                   String            @id @default(uuid())
+  instrumentId         String
+  applicationId        String?           @unique
+  address              String
+  administrativeUnitId String
+  postalCode           String?
+  latitude             Decimal?
+  longitude            Decimal?
+  effectiveFrom        TimestamptzString
+  effectiveUntil       TimestamptzString?
+
+  instrument         Instrument         @relation(fields: [instrumentId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  administrativeUnit AdministrativeUnit @relation(fields: [administrativeUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  application        Application?       @relation(fields: [applicationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@check(expression: "\"effectiveUntil\" IS NULL OR \"effectiveFrom\" < \"effectiveUntil\"", name: "location_history_window")
+  @@index([instrumentId, effectiveFrom], name: "instrument_location_history")
+}
+
+model Notification {
+  id            String              @id @default(uuid())
+  userId        String
+  certificateId String?
+  channel       NotificationChannel
+  event         String
+  payload       Json
+  status        NotificationStatus  @default(PENDING)
+  createdAt     TimestamptzString   @default(now())
+  sentAt        TimestamptzString?
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  certificate Certificate? @relation(fields: [certificateId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([userId, status])
+  @@index([certificateId])
+}
+
+// Append only: application code grants no update/delete permission to this model.
+model AuditLog {
+  id            String            @id @default(uuid())
+  actorId       String?
+  actorRole     String?
+  action        String
+  entityType    String
+  entityId      String
+  previousState Json?
+  newState      Json?
+  ipAddress     String?
+  userAgent     String?
+  deviceMetadata Json?
+  requestId     String?
+  latitude      Decimal?
+  longitude     Decimal?
+  createdAt     TimestamptzString @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
 }
