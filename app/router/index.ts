@@ -1,33 +1,31 @@
-import { os } from '@orpc/server'
-import * as z from 'zod'
-
-export const listPlanets = os
-  .handler(async () => {
-    // replace with your database query
-    return [
-      { id: 1, name: 'Earth' },
-      { id: 2, name: 'Mars' },
-    ]
-  })
-
-export const findPlanet = os
-  .input(z.object({ id: z.number() }))
-  .handler(async ({ input }) => {
-    // replace with your database query
-    return { id: input.id, name: 'Earth' }
-  })
-
-export const createPlanet = os
-  .input(z.object({ name: z.string(), description: z.string().optional() }))
-  .handler(async ({ input }) => {
-    // replace with your database insert
-    return { id: 3, ...input }
-  })
+import { authRouter } from "@/modules/auth/server/router";
+import { mastersRouter } from "@/modules/masters/server/router";
+import { organizationsRouter } from "@/modules/organizations/server/router";
+import { instrumentsRouter } from "@/modules/instruments/server/router";
+import { filesRouter } from "@/modules/files/server/router";
+import { applicationsRouter } from "@/modules/applications/server/router";
+import { schedulingRouter } from "@/modules/scheduling/server/router";
+import { inspectionsRouter } from "@/modules/inspections/server/router";
+import { certificatesRouter } from "@/modules/certificates/server/router";
+import { verificationRouter } from "@/modules/verification/server/router";
+import { notificationsRouter } from "@/modules/notifications/server/router";
+import { auditRouter } from "@/modules/audit/server/router";
+import { dashboardRouter } from "@/modules/dashboard/server/router";
 
 export const router = {
-  planet: {
-    list: listPlanets,
-    find: findPlanet,
-    create: createPlanet,
-  },
-}
+  auth: authRouter,
+  masters: mastersRouter,
+  organizations: organizationsRouter,
+  instruments: instrumentsRouter,
+  files: filesRouter,
+  applications: applicationsRouter,
+  scheduling: schedulingRouter,
+  inspections: inspectionsRouter,
+  certificates: certificatesRouter,
+  verification: verificationRouter,
+  notifications: notificationsRouter,
+  audit: auditRouter,
+  dashboard: dashboardRouter,
+};
+
+export type AppRouter = typeof router;
