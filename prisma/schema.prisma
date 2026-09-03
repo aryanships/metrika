@@ -171,9 +171,11 @@ model User {
   phone        String?
   isActive     Boolean           @default(true)
   invitedAt    TimestamptzString?
+  invitationTokenHash String? // SHA-256 of the pending invitation token (null once accepted)
   createdAt    TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
 
+  sessions              Session[]
   roles                 UserRole[]
   business              Business?
   lmoProfile            Lmo?
@@ -199,6 +201,22 @@ model UserRole {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([userId, role])
+}
+
+// Opaque server-side session: the cookie carries a random token, the DB stores
+// its SHA-256 hash so a leaked table never reveals usable session tokens.
+model Session {
+  id        String            @id @default(uuid())
+  tokenHash String            @unique
+  userId    String
+  expiresAt TimestamptzString
+  revokedAt TimestamptzString?
+  createdAt TimestamptzString @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model AdministrativeUnit {

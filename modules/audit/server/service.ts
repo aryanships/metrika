@@ -1,3 +1,4 @@
+import { ORPCError } from "@orpc/server";
 import { auditRepository, AuditLogRecord } from "./repository";
 import {
   ListAuditEventsInput,
@@ -6,7 +7,7 @@ import {
   AuditEventOutput,
 } from "../schema";
 
-function toSafeAuditEventOutput(rec: AuditLogRecord): AuditEventOutput {
+function toAuditEventOutput(rec: AuditLogRecord): AuditEventOutput {
   return {
     id: rec.id,
     actorId: rec.actorId,
@@ -14,77 +15,62 @@ function toSafeAuditEventOutput(rec: AuditLogRecord): AuditEventOutput {
     action: rec.action,
     entityType: rec.entityType,
     entityId: rec.entityId,
-    oldStateSafe: rec.oldStateSafe ?? null,
-    newStateSafe: rec.newStateSafe ?? null,
-    ipAddress: rec.ipAddress ?? null,
-    timestamp: rec.timestamp.toISOString(),
+    previousState: rec.previousState,
+    newState: rec.newState,
+    ipAddress: rec.ipAddress,
+    createdAt: rec.createdAt,
   };
 }
 
 export const auditService = {
   async recordAuditEvent(data: {
-    actorId: string;
-    actorRole: string;
+    actorId: string | null;
+    actorRole: string | null;
     action: string;
     entityType: string;
     entityId: string;
-    oldStateSafe?: Record<string, any> | null;
-    newStateSafe?: Record<string, any> | null;
+    previousState?: unknown;
+    newState?: unknown;
     ipAddress?: string | null;
-  }) {
-    // SECURITY: Ensure safe state records do not contain password hashes, tokens, or raw private keys
-    return auditRepository.recordEvent({
-      actorId: data.actorId,
-      actorRole: data.actorRole,
-      action: data.action,
-      entityType: data.entityType,
-      entityId: data.entityId,
-      oldStateSafe: data.oldStateSafe ?? null,
-      newStateSafe: data.newStateSafe ?? null,
-      ipAddress: data.ipAddress ?? null,
-    });
+    requestId?: string | null;
+  }): Promise<void> {
+    // SECURITY: callers must pass only safe state — never password hashes,
+    // session tokens, object-storage keys, or private evidence.
+    await auditRepository.recordEvent(data);
   },
 
   async listEvents(input: ListAuditEventsInput): Promise<ListAuditEventsOutput> {
-    const mock: AuditLogRecord = {
-      id: "aud_demo_1",
-      actorId: "usr_admin_1",
-      actorRole: "STATE_ADMIN",
-      action: "APPLICATION_APPROVED",
-      entityType: "Application",
-      entityId: "app_demo_1",
-      oldStateSafe: { status: "UNDER_REVIEW" },
-      newStateSafe: { status: "APPROVED" },
-      ipAddress: "127.0.0.1",
-      timestamp: new Date(),
-    };
+    const page = input.page ?? 1;
+    const limit = input.limit ?? 20;
+    const { items, total } = await auditRepository.listEvents({
+      entityType: input.entityType,
+      entityId: input.entityId,
+      actorId: input.actorId,
+      action: input.action,
+      offset: (page - 1) * limit,
+      limit,
+    });
 
     return {
-      items: [toSafeAuditEventOutput(mock)],
+      items: items.map(toAuditEventOutput),
       pagination: {
-        page: input.page ?? 1,
-        limit: input.limit ?? 20,
-        total: 1,
-        totalPages: 1,
-        hasMore: false,
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasMore: page * limit < total,
         nextCursor: null,
       },
     };
   },
 
   async getEvent(input: GetAuditEventInput): Promise<AuditEventOutput> {
-    const mock: AuditLogRecord = {
-      id: input.id,
-      actorId: "usr_admin_1",
-      actorRole: "STATE_ADMIN",
-      action: "APPLICATION_APPROVED",
-      entityType: "Application",
-      entityId: "app_demo_1",
-      oldStateSafe: { status: "UNDER_REVIEW" },
-      newStateSafe: { status: "APPROVED" },
-      ipAddress: "127.0.0.1",
-      timestamp: new Date(),
-    };
-    return toSafeAuditEventOutput(mock);
+    const rec = await auditRepository.findById(input.id);
+    if (!rec) {
+      throw new ORPCError("NOT_FOUND", {
+        data: { resourceType: "AuditLog", resourceId: input.id },
+      });
+    }
+    return toAuditEventOutput(rec);
   },
 };

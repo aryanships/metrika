@@ -1,12 +1,12 @@
 import 'dotenv/config';
 import crypto from 'crypto';
+import bcrypt from 'bcrypt';
 import { db } from './db';
 
 const orm = db.orm.public;
 
 const DEMO_PASSWORD = 'Demo1234!';
-// Standard bcrypt hash for Demo1234!
-const PASSWORD_HASH = '$2a$10$wN10Uq2eQzK/F7y71Qf1z.aO7uP4zYxT5bF5x3F6pG7h8j9k0l1m2';
+const PASSWORD_HASH = await bcrypt.hash(DEMO_PASSWORD, 10);
 
 async function getOrCreateUser(data: {
   email: string;
@@ -23,6 +23,8 @@ async function getOrCreateUser(data: {
       passwordHash: PASSWORD_HASH,
       isActive: true,
     });
+  } else if (!user.passwordHash || !(await bcrypt.compare(DEMO_PASSWORD, user.passwordHash))) {
+    await orm.User.where({ id: user.id }).update({ passwordHash: PASSWORD_HASH });
   }
 
   const existingRole = await orm.UserRole.where({ userId: user.id, role: data.role }).first();

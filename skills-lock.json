@@ -24,6 +24,12 @@
       "sourceType": "github",
       "skillPath": "skills/orpc-openapi/SKILL.md",
       "computedHash": "ca9692579a8c5baa7f392ed9c54ce7488ea3be6be8061a3e5c2ab9b7d9f55038"
+    },
+    "ponytail": {
+      "source": "dietrichgebert/ponytail",
+      "sourceType": "github",
+      "skillPath": "skills/ponytail/SKILL.md",
+      "computedHash": "210fa0831f649ce9f8a305f7b7c8cf2a0dd09ac4dd53067109941b96e7811d4e"
     }
   }
 }

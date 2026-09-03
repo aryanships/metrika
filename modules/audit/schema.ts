@@ -3,15 +3,15 @@ import { PaginationInputSchema, PaginationMetaSchema } from "@/schemas/shared";
 
 export const AuditEventOutputSchema = z.object({
   id: z.string(),
-  actorId: z.string(),
-  actorRole: z.string(),
+  actorId: z.string().nullable(),
+  actorRole: z.string().nullable(),
   action: z.string(),
   entityType: z.string(),
   entityId: z.string(),
-  oldStateSafe: z.record(z.string(), z.any()).nullable().optional(),
-  newStateSafe: z.record(z.string(), z.any()).nullable().optional(),
-  ipAddress: z.string().nullable().optional(),
-  timestamp: z.string(),
+  previousState: z.unknown().nullable(),
+  newState: z.unknown().nullable(),
+  ipAddress: z.string().nullable(),
+  createdAt: z.string(),
 });
 export type AuditEventOutput = z.infer<typeof AuditEventOutputSchema>;
 

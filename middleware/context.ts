@@ -1,26 +1,60 @@
+import { authService } from "@/modules/auth/server/service";
+import type { UserRole } from "@/modules/auth/schema";
+
+export const SESSION_COOKIE = "metrika_session";
+
 export interface AppUser {
   id: string;
   email: string;
-  name?: string | null;
-  role: string;
-  businessId?: string | null;
-  stateId?: string | null;
-  districtId?: string | null;
-  gatcId?: string | null;
+  fullName: string;
+  roles: UserRole[];
+  phone: string | null;
+  businessId: string | null;
+  isActive: boolean;
+}
+
+export interface HeaderReader {
+  get(name: string): string | null;
 }
 
 export interface AppContext {
-  headers: Headers;
-  user?: AppUser | null;
-  sessionId?: string | null;
-  requestId?: string;
+  headers: HeaderReader;
+  resHeaders: Headers;
+  user: AppUser | null;
+  sessionToken: string | null;
+  requestId: string;
+  clientIp: string | null;
 }
 
-export function createInitialContext(headers: Headers): AppContext {
+export function getClientIp(headers: HeaderReader): string | null {
+  const forwarded = headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0]!.trim() || null;
+  return headers.get("x-real-ip");
+}
+
+function readCookie(headers: HeaderReader, name: string): string | null {
+  const cookie = headers.get("cookie");
+  if (!cookie) return null;
+  for (const part of cookie.split(";")) {
+    const [key, ...rest] = part.trim().split("=");
+    if (key === name) return rest.join("=");
+  }
+  return null;
+}
+
+export async function createInitialContext(
+  headers: HeaderReader,
+  resHeaders: Headers = new Headers(),
+): Promise<AppContext> {
+  const token = readCookie(headers, SESSION_COOKIE);
+  const user = token ? await authService.resolveSession(token) : null;
+
   return {
     headers,
-    user: null,
-    sessionId: null,
+    resHeaders,
+    user,
+    sessionToken: token ?? null,
     requestId: headers.get("x-request-id") ?? crypto.randomUUID(),
+    clientIp: getClientIp(headers),
   };
 }

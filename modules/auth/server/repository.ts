@@ -4,39 +4,87 @@
  * Other modules MUST NEVER import this repository directly.
  * Instead, call the exposed methods in `modules/auth/server/service.ts` or procedures.
  */
+import { db } from "@/prisma/db";
+
+export type Orm = typeof db.orm;
 
 export interface UserRecord {
   id: string;
   email: string;
-  passwordHash: string;
+  passwordHash: string | null;
   fullName: string;
-  role: string;
-  phone?: string | null;
-  businessId?: string | null;
+  phone: string | null;
   isActive: boolean;
-  createdAt: Date;
+  invitedAt: string | null;
+  invitationTokenHash: string | null;
+  createdAt: string;
+}
+
+export interface SessionRecord {
+  id: string;
+  tokenHash: string;
+  userId: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  createdAt: string;
 }
 
 export const authRepository = {
-  async findByEmail(email: string): Promise<UserRecord | null> {
-    // In Phase 0 skeleton, placeholder returning null. Phase 1/2 connects Prisma.
-    return null;
+  findByEmail(email: string, orm: Orm = db.orm) {
+    return orm.public.User.where({ email }).first();
   },
 
-  async findById(id: string): Promise<UserRecord | null> {
-    return null;
+  findById(id: string, orm: Orm = db.orm) {
+    return orm.public.User.where({ id }).first();
   },
 
-  async createUser(data: Omit<UserRecord, "id" | "createdAt">): Promise<UserRecord> {
-    const record: UserRecord = {
-      id: `usr_${Date.now()}`,
-      createdAt: new Date(),
-      ...data,
-    };
-    return record;
+  findRoles(userId: string, orm: Orm = db.orm) {
+    return orm.public.UserRole.where({ userId }).all();
   },
 
-  async findInvitationByToken(token: string) {
-    return null;
+  findBusinessId(userId: string, orm: Orm = db.orm) {
+    return orm.public.Business.where({ userId }).select("id").first();
+  },
+
+  createUser(
+    data: {
+      email: string;
+      passwordHash: string | null;
+      fullName: string;
+      phone?: string | null;
+      isActive?: boolean;
+      invitedAt?: string | null;
+    },
+    orm: Orm = db.orm,
+  ) {
+    return orm.public.User.create(data);
+  },
+
+  createRole(
+    userId: string,
+    role: "INSTRUMENT_OWNER" | "LMO" | "DISTRICT_ADMIN" | "STATE_ADMIN" | "DEPARTMENT_OFFICIAL" | "SYSTEM_ADMIN",
+    orm: Orm = db.orm,
+  ) {
+    return orm.public.UserRole.create({ userId, role });
+  },
+
+  updateUser(
+    id: string,
+    data: Partial<Pick<UserRecord, "passwordHash" | "fullName" | "phone" | "isActive" | "invitedAt" | "invitationTokenHash">>,
+    orm: Orm = db.orm,
+  ) {
+    return orm.public.User.where({ id }).update(data);
+  },
+
+  createSession(data: { tokenHash: string; userId: string; expiresAt: string }, orm: Orm = db.orm) {
+    return orm.public.Session.create(data);
+  },
+
+  findSessionByTokenHash(tokenHash: string, orm: Orm = db.orm) {
+    return orm.public.Session.where({ tokenHash }).first();
+  },
+
+  revokeSessionByTokenHash(tokenHash: string, orm: Orm = db.orm) {
+    return orm.public.Session.where({ tokenHash }).update({ revokedAt: new Date().toISOString() });
   },
 };
