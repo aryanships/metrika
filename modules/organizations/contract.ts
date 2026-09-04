@@ -1,78 +1,62 @@
 import { base } from "@/contracts/base";
 import {
+  ListLmosInputSchema,
+  ListLmosOutputSchema,
+  CreateLmoInputSchema,
+  LmoCreatedOutputSchema,
   ListGatcsInputSchema,
   ListGatcsOutputSchema,
   CreateGatcInputSchema,
   GatcOutputSchema,
   InviteGatcStaffInputSchema,
-  InviteStaffOutputSchema,
-  ListLmosInputSchema,
-  ListLmosOutputSchema,
-  CreateLmoInputSchema,
-  LmoOutputSchema,
+  InviteGatcStaffOutputSchema,
+  ProvisionAdminInputSchema,
+  ProvisionAdminOutputSchema,
+  SetAdminScopesInputSchema,
+  SetAdminScopesOutputSchema,
 } from "./schema";
 
-export const listGatcsContract = base
-  .route({
-    method: "GET",
-    path: "/organizations/gatcs",
-    summary: "List GATC centres",
-    description: "Lists Government Approved Test Centres with approval status and authorizations.",
-    tags: ["Organizations"],
-  })
-  .input(ListGatcsInputSchema)
-  .output(ListGatcsOutputSchema);
-
-export const createGatcContract = base
-  .route({
-    method: "POST",
-    path: "/organizations/gatcs",
-    successStatus: 201,
-    summary: "Register GATC centre",
-    description: "Provisions a new GATC organisation with approval validity and authorized categories.",
-    tags: ["Organizations"],
-  })
-  .input(CreateGatcInputSchema)
-  .output(GatcOutputSchema);
-
-export const inviteGatcStaffContract = base
-  .route({
-    method: "POST",
-    path: "/organizations/gatcs/invite-staff",
-    summary: "Invite GATC staff",
-    description: "Invites a manager or operator scoped to a specific GATC centre.",
-    tags: ["Organizations"],
-  })
-  .input(InviteGatcStaffInputSchema)
-  .output(InviteStaffOutputSchema);
-
 export const listLmosContract = base
-  .route({
-    method: "GET",
-    path: "/organizations/lmos",
-    summary: "List Legal Metrology Officers",
-    description: "Lists LMO profiles with employee designations, jurisdictions, and expertise.",
-    tags: ["Organizations"],
-  })
+  .route({ method: "GET", path: "/organizations/lmos", summary: "List LMOs", tags: ["Organizations"] })
   .input(ListLmosInputSchema)
   .output(ListLmosOutputSchema);
 
 export const createLmoContract = base
-  .route({
-    method: "POST",
-    path: "/organizations/lmos",
-    successStatus: 201,
-    summary: "Provision LMO profile",
-    description: "Provisions a Legal Metrology Officer with verified employee ID and jurisdictions.",
-    tags: ["Organizations"],
-  })
+  .route({ method: "POST", path: "/organizations/lmos", successStatus: 201, summary: "Provision LMO", tags: ["Organizations"] })
   .input(CreateLmoInputSchema)
-  .output(LmoOutputSchema);
+  .output(LmoCreatedOutputSchema);
+
+export const listGatcsContract = base
+  .route({ method: "GET", path: "/organizations/gatcs", summary: "List GATCs", tags: ["Organizations"] })
+  .input(ListGatcsInputSchema)
+  .output(ListGatcsOutputSchema);
+
+export const createGatcContract = base
+  .route({ method: "POST", path: "/organizations/gatcs", successStatus: 201, summary: "Provision GATC", tags: ["Organizations"] })
+  .input(CreateGatcInputSchema)
+  .output(GatcOutputSchema);
+
+export const inviteGatcStaffContract = base
+  .route({ method: "POST", path: "/organizations/gatcs/invite-staff", successStatus: 201, summary: "Invite GATC staff", tags: ["Organizations"] })
+  .input(InviteGatcStaffInputSchema)
+  .output(InviteGatcStaffOutputSchema);
+
+export const provisionAdminContract = base
+  .route({ method: "POST", path: "/organizations/admins", successStatus: 201, summary: "Provision admin account", tags: ["Organizations"] })
+  .input(ProvisionAdminInputSchema)
+  .output(ProvisionAdminOutputSchema);
+
+export const setAdminScopesContract = base
+  .route({ method: "PUT", path: "/organizations/admins/scopes", summary: "Set admin scopes", tags: ["Organizations"] })
+  .input(SetAdminScopesInputSchema)
+  .output(SetAdminScopesOutputSchema);
 
 export const organizationsContract = {
+  listLmos: listLmosContract,
+  createLmo: createLmoContract,
   listGatcs: listGatcsContract,
   createGatc: createGatcContract,
   inviteGatcStaff: inviteGatcStaffContract,
-  listLmos: listLmosContract,
-  createLmo: createLmoContract,
+  provisionAdmin: provisionAdminContract,
+  setAdminScopes: setAdminScopesContract,
 };

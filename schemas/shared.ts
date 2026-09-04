@@ -30,6 +30,17 @@ export function createPaginatedOutputSchema<T extends z.ZodTypeAny>(itemSchema: 
   });
 }
 
+export function paginationMeta(total: number, page: number, limit: number): PaginationMeta {
+  return {
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
+    hasMore: page * limit < total,
+    nextCursor: null,
+  };
+}
+
 export const DateRangeSchema = z.object({
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),

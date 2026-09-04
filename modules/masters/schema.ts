@@ -1,17 +1,20 @@
 import { z } from "zod";
 import { PaginationInputSchema, PaginationMetaSchema } from "@/schemas/shared";
 
+// ---------------------------------------------------------------------------
+// Administrative units (State -> District -> Tehsil -> Village)
+// ---------------------------------------------------------------------------
+
 export const AdminUnitTypeSchema = z.enum(["STATE", "DISTRICT", "TEHSIL", "VILLAGE"]);
 export type AdminUnitType = z.infer<typeof AdminUnitTypeSchema>;
 
 export const AdministrativeUnitOutputSchema = z.object({
   id: z.string(),
-  code: z.string(),
   name: z.string(),
   type: AdminUnitTypeSchema,
-  parentId: z.string().nullable().optional(),
-  active: z.boolean(),
-  createdAt: z.string(),
+  parentId: z.string().nullable(),
+  latitude: z.string().nullable(),
+  longitude: z.string().nullable(),
 });
 export type AdministrativeUnitOutput = z.infer<typeof AdministrativeUnitOutputSchema>;
 
@@ -28,28 +31,27 @@ export const ListAdministrativeUnitsOutputSchema = z.object({
 export type ListAdministrativeUnitsOutput = z.infer<typeof ListAdministrativeUnitsOutputSchema>;
 
 export const CreateAdministrativeUnitInputSchema = z.object({
-  code: z.string().min(1, "Code is required"),
   name: z.string().min(1, "Name is required"),
   type: AdminUnitTypeSchema,
   parentId: z.string().optional(),
+  latitude: z.string().optional(),
+  longitude: z.string().optional(),
 });
 export type CreateAdministrativeUnitInput = z.infer<typeof CreateAdministrativeUnitInputSchema>;
+
+// ---------------------------------------------------------------------------
+// Instrument types (controlled master categories)
+// ---------------------------------------------------------------------------
 
 export const InstrumentTypeOutputSchema = z.object({
   id: z.string(),
   code: z.string(),
   name: z.string(),
-  category: z.string(),
-  active: z.boolean(),
-  description: z.string().nullable().optional(),
-  createdAt: z.string(),
+  unit: z.string(),
 });
 export type InstrumentTypeOutput = z.infer<typeof InstrumentTypeOutputSchema>;
 
-export const ListInstrumentTypesInputSchema = PaginationInputSchema.extend({
-  category: z.string().optional(),
-  activeOnly: z.boolean().optional().default(true),
-});
+export const ListInstrumentTypesInputSchema = PaginationInputSchema;
 export type ListInstrumentTypesInput = z.infer<typeof ListInstrumentTypesInputSchema>;
 
 export const ListInstrumentTypesOutputSchema = z.object({
@@ -61,29 +63,30 @@ export type ListInstrumentTypesOutput = z.infer<typeof ListInstrumentTypesOutput
 export const CreateInstrumentTypeInputSchema = z.object({
   code: z.string().min(1, "Code is required"),
   name: z.string().min(1, "Name is required"),
-  category: z.string().min(1, "Category is required"),
-  description: z.string().optional(),
+  unit: z.string().min(1, "Unit is required"),
 });
 export type CreateInstrumentTypeInput = z.infer<typeof CreateInstrumentTypeInputSchema>;
+
+// ---------------------------------------------------------------------------
+// Regulatory rules (versioned by effective window; decimals are strings)
+// ---------------------------------------------------------------------------
 
 export const RegulatoryRuleOutputSchema = z.object({
   id: z.string(),
   instrumentTypeId: z.string(),
   accuracyClass: z.string(),
-  capacityMin: z.number(),
-  capacityMax: z.number(),
-  verificationPeriodMonths: z.number(),
-  permissibleError: z.number(),
+  capacityMin: z.string(),
+  capacityMax: z.string(),
+  permissibleError: z.string(),
+  verificationPeriodMonths: z.number().int(),
   effectiveFrom: z.string(),
-  effectiveTo: z.string().nullable().optional(),
-  active: z.boolean(),
-  createdAt: z.string(),
+  effectiveUntil: z.string().nullable(),
 });
 export type RegulatoryRuleOutput = z.infer<typeof RegulatoryRuleOutputSchema>;
 
 export const ListRegulatoryRulesInputSchema = PaginationInputSchema.extend({
   instrumentTypeId: z.string().optional(),
-  activeOnly: z.boolean().optional().default(true),
+  accuracyClass: z.string().optional(),
 });
 export type ListRegulatoryRulesInput = z.infer<typeof ListRegulatoryRulesInputSchema>;
 
@@ -96,30 +99,55 @@ export type ListRegulatoryRulesOutput = z.infer<typeof ListRegulatoryRulesOutput
 export const CreateRegulatoryRuleInputSchema = z.object({
   instrumentTypeId: z.string().min(1, "Instrument type is required"),
   accuracyClass: z.string().min(1, "Accuracy class is required"),
-  capacityMin: z.number().nonnegative(),
-  capacityMax: z.number().positive(),
+  capacityMin: z.string().min(1, "Capacity minimum is required"),
+  capacityMax: z.string().min(1, "Capacity maximum is required"),
+  permissibleError: z.string().min(1, "Permissible error is required"),
   verificationPeriodMonths: z.number().int().positive(),
-  permissibleError: z.number().positive(),
   effectiveFrom: z.string().datetime(),
-  effectiveTo: z.string().datetime().optional(),
+  effectiveUntil: z.string().datetime().optional(),
 });
 export type CreateRegulatoryRuleInput = z.infer<typeof CreateRegulatoryRuleInputSchema>;
+
+// ---------------------------------------------------------------------------
+// Inspection templates (versioned, with ordered items)
+// ---------------------------------------------------------------------------
+
+export const InspectionTemplateItemKindSchema = z.enum([
+  "CHECKLIST",
+  "NUMERIC",
+  "TEXT",
+  "SELECT",
+  "MEASUREMENT",
+]);
+export type InspectionTemplateItemKind = z.infer<typeof InspectionTemplateItemKindSchema>;
+
+export const InspectionTemplateItemOutputSchema = z.object({
+  id: z.string(),
+  code: z.string(),
+  label: z.string(),
+  kind: InspectionTemplateItemKindSchema,
+  unit: z.string().nullable(),
+  isRequired: z.boolean(),
+  displayOrder: z.number().int(),
+});
+export type InspectionTemplateItemOutput = z.infer<typeof InspectionTemplateItemOutputSchema>;
 
 export const InspectionTemplateOutputSchema = z.object({
   id: z.string(),
   instrumentTypeId: z.string(),
-  version: z.number(),
-  title: z.string(),
-  description: z.string().nullable().optional(),
-  schemaJson: z.string(),
-  active: z.boolean(),
+  code: z.string(),
+  name: z.string(),
+  version: z.number().int(),
+  effectiveFrom: z.string(),
+  effectiveUntil: z.string().nullable(),
+  isActive: z.boolean(),
   createdAt: z.string(),
+  items: z.array(InspectionTemplateItemOutputSchema),
 });
 export type InspectionTemplateOutput = z.infer<typeof InspectionTemplateOutputSchema>;
 
 export const ListInspectionTemplatesInputSchema = PaginationInputSchema.extend({
   instrumentTypeId: z.string().optional(),
-  activeOnly: z.boolean().optional().default(true),
 });
 export type ListInspectionTemplatesInput = z.infer<typeof ListInspectionTemplatesInputSchema>;
 
@@ -129,10 +157,22 @@ export const ListInspectionTemplatesOutputSchema = z.object({
 });
 export type ListInspectionTemplatesOutput = z.infer<typeof ListInspectionTemplatesOutputSchema>;
 
+export const CreateInspectionTemplateItemInputSchema = z.object({
+  code: z.string().min(1, "Item code is required"),
+  label: z.string().min(1, "Item label is required"),
+  kind: InspectionTemplateItemKindSchema,
+  unit: z.string().optional(),
+  isRequired: z.boolean().default(false),
+  displayOrder: z.number().int(),
+});
+export type CreateInspectionTemplateItemInput = z.infer<typeof CreateInspectionTemplateItemInputSchema>;
+
 export const CreateInspectionTemplateInputSchema = z.object({
   instrumentTypeId: z.string().min(1, "Instrument type is required"),
-  title: z.string().min(1, "Title is required"),
-  description: z.string().optional(),
-  schemaJson: z.string().min(2, "Template schema JSON is required"),
+  code: z.string().min(1, "Template code is required"),
+  name: z.string().min(1, "Template name is required"),
+  effectiveFrom: z.string().datetime(),
+  effectiveUntil: z.string().datetime().optional(),
+  items: z.array(CreateInspectionTemplateItemInputSchema).min(1, "At least one item is required"),
 });
 export type CreateInspectionTemplateInput = z.infer<typeof CreateInspectionTemplateInputSchema>;

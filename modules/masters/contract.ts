@@ -19,94 +19,42 @@ import {
 } from "./schema";
 
 export const listAdministrativeUnitsContract = base
-  .route({
-    method: "GET",
-    path: "/masters/administrative-units",
-    summary: "List administrative units",
-    description: "Lists States, Districts, Tehsils, and Villages in the hierarchy.",
-    tags: ["Masters"],
-  })
+  .route({ method: "GET", path: "/masters/administrative-units", summary: "List administrative units", tags: ["Masters"] })
   .input(ListAdministrativeUnitsInputSchema)
   .output(ListAdministrativeUnitsOutputSchema);
 
 export const createAdministrativeUnitContract = base
-  .route({
-    method: "POST",
-    path: "/masters/administrative-units",
-    successStatus: 201,
-    summary: "Create administrative unit",
-    description: "Adds a new node in the administrative unit hierarchy.",
-    tags: ["Masters"],
-  })
+  .route({ method: "POST", path: "/masters/administrative-units", successStatus: 201, summary: "Create administrative unit", tags: ["Masters"] })
   .input(CreateAdministrativeUnitInputSchema)
   .output(AdministrativeUnitOutputSchema);
 
 export const listInstrumentTypesContract = base
-  .route({
-    method: "GET",
-    path: "/masters/instrument-types",
-    summary: "List instrument types",
-    description: "Lists master instrument categories and measurement kinds.",
-    tags: ["Masters"],
-  })
+  .route({ method: "GET", path: "/masters/instrument-types", summary: "List instrument types", tags: ["Masters"] })
   .input(ListInstrumentTypesInputSchema)
   .output(ListInstrumentTypesOutputSchema);
 
 export const createInstrumentTypeContract = base
-  .route({
-    method: "POST",
-    path: "/masters/instrument-types",
-    successStatus: 201,
-    summary: "Create instrument type",
-    description: "Defines a new controlled instrument type master record.",
-    tags: ["Masters"],
-  })
+  .route({ method: "POST", path: "/masters/instrument-types", successStatus: 201, summary: "Create instrument type", tags: ["Masters"] })
   .input(CreateInstrumentTypeInputSchema)
   .output(InstrumentTypeOutputSchema);
 
 export const listRegulatoryRulesContract = base
-  .route({
-    method: "GET",
-    path: "/masters/regulatory-rules",
-    summary: "List regulatory rules",
-    description: "Lists versioned tolerance and verification rules.",
-    tags: ["Masters"],
-  })
+  .route({ method: "GET", path: "/masters/regulatory-rules", summary: "List regulatory rules", tags: ["Masters"] })
   .input(ListRegulatoryRulesInputSchema)
   .output(ListRegulatoryRulesOutputSchema);
 
 export const createRegulatoryRuleContract = base
-  .route({
-    method: "POST",
-    path: "/masters/regulatory-rules",
-    successStatus: 201,
-    summary: "Create regulatory rule",
-    description: "Provisions a versioned tolerance rule with effective date bounds.",
-    tags: ["Masters"],
-  })
+  .route({ method: "POST", path: "/masters/regulatory-rules", successStatus: 201, summary: "Create regulatory rule", tags: ["Masters"] })
   .input(CreateRegulatoryRuleInputSchema)
   .output(RegulatoryRuleOutputSchema);
 
 export const listInspectionTemplatesContract = base
-  .route({
-    method: "GET",
-    path: "/masters/inspection-templates",
-    summary: "List inspection templates",
-    description: "Lists versioned inspection checklist and measurement schemas.",
-    tags: ["Masters"],
-  })
+  .route({ method: "GET", path: "/masters/inspection-templates", summary: "List inspection templates", tags: ["Masters"] })
   .input(ListInspectionTemplatesInputSchema)
   .output(ListInspectionTemplatesOutputSchema);
 
 export const createInspectionTemplateContract = base
-  .route({
-    method: "POST",
-    path: "/masters/inspection-templates",
-    successStatus: 201,
-    summary: "Create inspection template",
-    description: "Provisions a new category-specific inspection checklist template.",
-    tags: ["Masters"],
-  })
+  .route({ method: "POST", path: "/masters/inspection-templates", successStatus: 201, summary: "Create inspection template", tags: ["Masters"] })
   .input(CreateInspectionTemplateInputSchema)
   .output(InspectionTemplateOutputSchema);
 
