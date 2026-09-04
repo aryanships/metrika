@@ -33,7 +33,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'6c0a162664a7a65291c1493da3e4a31fa6a0c39f87fab45d645babbc495f4bec'>;
+  StorageHashBase<'b75537e9f28530374740e28e3ec66d6c587852954dc98f8e34ac700d457b723c'>;
 export type ExecutionHash =
   ExecutionHashBase<'f18347476a82879caed5e364b33b5338dcb6f43a433d37b1c99d9c994a25f519'>;
 export type ProfileHash =
@@ -630,6 +630,7 @@ export type FieldOutputTypes = {
       readonly status: 'PENDING' | 'SENT' | 'FAILED';
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
       readonly sentAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+      readonly readAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
     };
     readonly RegulatoryRule: {
       readonly id: CodecTypes['pg/text@1']['output'];
@@ -1082,6 +1083,7 @@ export type FieldInputTypes = {
       readonly status: 'PENDING' | 'SENT' | 'FAILED';
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly sentAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
+      readonly readAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
     };
     readonly RegulatoryRule: {
       readonly id: CodecTypes['pg/text@1']['input'];
@@ -1531,6 +1533,7 @@ export type StorageColumnTypes = {
       readonly event: CodecTypes['pg/text@1']['output'];
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly payload: CodecTypes['pg/json@1']['output'];
+      readonly readAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
       readonly sentAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
       readonly status: 'PENDING' | 'SENT' | 'FAILED';
       readonly userId: CodecTypes['pg/text@1']['output'];
@@ -1983,6 +1986,7 @@ export type StorageColumnInputTypes = {
       readonly event: CodecTypes['pg/text@1']['input'];
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly payload: CodecTypes['pg/json@1']['input'];
+      readonly readAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
       readonly sentAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
       readonly status: 'PENDING' | 'SENT' | 'FAILED';
       readonly userId: CodecTypes['pg/text@1']['input'];
@@ -4727,6 +4731,11 @@ type ContractBase = Omit<
                   readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
                 };
                 readonly sentAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                  readonly nullable: true;
+                };
+                readonly readAt: {
                   readonly nativeType: 'timestamptz';
                   readonly codecId: 'pg/timestamptz-string@1';
                   readonly nullable: true;
@@ -8244,6 +8253,13 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/timestamptz-string@1';
                 };
               };
+              readonly readAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                };
+              };
             };
             readonly relations: {
               readonly certificate: {
@@ -8279,6 +8295,7 @@ type ContractBase = Omit<
                 readonly status: { readonly column: 'status' };
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly sentAt: { readonly column: 'sentAt' };
+                readonly readAt: { readonly column: 'readAt' };
               };
             };
           };

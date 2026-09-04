@@ -38,6 +38,23 @@ async function getOrCreateUser(data: {
   return user;
 }
 
+// GATC staff carry centre-scoped authority (GatcMembership) only — never a
+// global role. Clears any previously-seeded global role for the same login.
+async function getOrCreateStaffUser(data: { email: string; fullName: string }) {
+  let user = await orm.User.where({ email: data.email }).first();
+  if (!user) {
+    user = await orm.User.create({
+      email: data.email,
+      fullName: data.fullName,
+      phone: '+919876543210',
+      passwordHash: PASSWORD_HASH,
+      isActive: true,
+    });
+  }
+  await orm.UserRole.where({ userId: user.id }).delete();
+  return user;
+}
+
 async function getOrCreateAdminUnit(data: {
   name: string;
   type: 'STATE' | 'DISTRICT' | 'TEHSIL' | 'VILLAGE';
@@ -482,32 +499,20 @@ export async function main() {
           administrativeUnitId: aId,
         });
       }
-
-      // Staff (Manager & Operator)
-      const mgr = await getOrCreateUser({
-        email: g.mgrEmail,
-        fullName: g.mgrName,
-        role: 'SYSTEM_ADMIN',
-      });
-      await orm.GatcMembership.create({
-        gatcId: gatc.id,
-        userId: mgr.id,
-        role: 'MANAGER',
-        isActive: true,
-      });
-
-      const op = await getOrCreateUser({
-        email: g.opEmail,
-        fullName: g.opName,
-        role: 'SYSTEM_ADMIN',
-      });
-      await orm.GatcMembership.create({
-        gatcId: gatc.id,
-        userId: op.id,
-        role: 'OPERATOR',
-        isActive: true,
-      });
     }
+
+    // Staff (Manager & Operator): centre-scoped authority only, no global role.
+    // Runs every seed so pre-existing GATC staff lose any erroneously-seeded role.
+    const mgr = await getOrCreateStaffUser({ email: g.mgrEmail, fullName: g.mgrName });
+    if (!(await orm.GatcMembership.where({ gatcId: gatc.id, userId: mgr.id }).first())) {
+      await orm.GatcMembership.create({ gatcId: gatc.id, userId: mgr.id, role: 'MANAGER', isActive: true });
+    }
+
+    const op = await getOrCreateStaffUser({ email: g.opEmail, fullName: g.opName });
+    if (!(await orm.GatcMembership.where({ gatcId: gatc.id, userId: op.id }).first())) {
+      await orm.GatcMembership.create({ gatcId: gatc.id, userId: op.id, role: 'OPERATOR', isActive: true });
+    }
+
     seededGatcs.push(gatc);
   }
 

@@ -1,11 +1,11 @@
 import { base } from "@/contracts/base";
 import {
-  CreateUploadIntentInputSchema,
-  UploadIntentOutputSchema,
+  AttachmentOutputSchema,
   ConfirmUploadInputSchema,
-  FileMetadataOutputSchema,
-  GetDownloadUrlInputSchema,
+  CreateUploadIntentInputSchema,
   DownloadUrlOutputSchema,
+  GetDownloadUrlInputSchema,
+  UploadIntentOutputSchema,
 } from "./schema";
 
 export const createUploadIntentContract = base
@@ -14,7 +14,7 @@ export const createUploadIntentContract = base
     path: "/files/upload-intent",
     successStatus: 201,
     summary: "Request signed upload intent",
-    description: "Validates file policy and issues a temporary pre-signed URL for direct upload.",
+    description: "Validates file policy and authorization, then issues a temporary pre-signed PUT URL for direct upload.",
     tags: ["Files"],
   })
   .input(CreateUploadIntentInputSchema)
@@ -25,18 +25,18 @@ export const confirmUploadContract = base
     method: "POST",
     path: "/files/confirm",
     summary: "Confirm completed file upload",
-    description: "Verifies the uploaded object and commits FileObject metadata.",
+    description: "Verifies the uploaded object in storage and commits FileObject and Attachment metadata.",
     tags: ["Files"],
   })
   .input(ConfirmUploadInputSchema)
-  .output(FileMetadataOutputSchema);
+  .output(AttachmentOutputSchema);
 
 export const getDownloadUrlContract = base
   .route({
     method: "GET",
     path: "/files/{fileId}/download",
     summary: "Get temporary download URL",
-    description: "Issues a time-limited signed URL to download private evidence or certificate.",
+    description: "Issues a time-limited signed URL to download private evidence or documents.",
     tags: ["Files"],
   })
   .input(GetDownloadUrlInputSchema)

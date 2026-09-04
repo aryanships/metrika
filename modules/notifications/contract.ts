@@ -11,7 +11,7 @@ export const listMineNotificationsContract = base
     method: "GET",
     path: "/notifications/mine",
     summary: "List user notifications",
-    description: "Retrieves unread and historical notifications for the current authenticated user.",
+    description: "Retrieves unread and historical in-app notifications for the current authenticated user.",
     tags: ["Notifications"],
   })
   .input(ListNotificationsInputSchema)

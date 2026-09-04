@@ -4990,6 +4990,13 @@
                   "kind": "scalar"
                 }
               },
+              "readAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
               "sentAt": {
                 "nullable": true,
                 "type": {
@@ -5069,6 +5076,9 @@
                 },
                 "payload": {
                   "column": "payload"
+                },
+                "readAt": {
+                  "column": "readAt"
                 },
                 "sentAt": {
                   "column": "sentAt"
@@ -9664,6 +9674,11 @@
                   "nativeType": "json",
                   "nullable": false
                 },
+                "readAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
                 "sentAt": {
                   "codecId": "pg/timestamptz-string@1",
                   "nativeType": "timestamptz",
@@ -10519,7 +10534,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "6c0a162664a7a65291c1493da3e4a31fa6a0c39f87fab45d645babbc495f4bec"
+    "storageHash": "b75537e9f28530374740e28e3ec66d6c587852954dc98f8e34ac700d457b723c"
   },
   "execution": {
     "executionHash": "f18347476a82879caed5e364b33b5338dcb6f43a433d37b1c99d9c994a25f519",

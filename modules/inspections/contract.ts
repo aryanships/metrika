@@ -22,9 +22,9 @@ export const startInspectionContract = base
 export const getInspectionContract = base
   .route({
     method: "GET",
-    path: "/inspections/{id}",
+    path: "/inspections/{applicationId}",
     summary: "Get inspection details",
-    description: "Retrieves inspection form, measurements, observations, and status.",
+    description: "Retrieves inspection form, measurements, responses, evidence, and status for an application.",
     tags: ["Inspections"],
   })
   .input(GetInspectionInputSchema)
@@ -33,9 +33,9 @@ export const getInspectionContract = base
 export const saveDraftInspectionContract = base
   .route({
     method: "PATCH",
-    path: "/inspections/{id}/draft",
+    path: "/inspections/{applicationId}/draft",
     summary: "Save draft inspection data",
-    description: "Persists progressive measurement entries and checklist responses before finalization.",
+    description: "Persists measurement entries, template responses, and observations before finalization.",
     tags: ["Inspections"],
   })
   .input(SaveDraftInspectionInputSchema)
@@ -44,9 +44,9 @@ export const saveDraftInspectionContract = base
 export const submitInspectionContract = base
   .route({
     method: "POST",
-    path: "/inspections/{id}/submit",
+    path: "/inspections/{applicationId}/submit",
     summary: "Finalize and submit inspection",
-    description: "Calculates pass/fail outcome, verifies evidence requirements, locks inspection, and commits audit record.",
+    description: "Verifies measurements and required evidence, computes the pass/fail result, and locks the inspection.",
     tags: ["Inspections"],
   })
   .input(SubmitInspectionInputSchema)

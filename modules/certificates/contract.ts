@@ -4,7 +4,8 @@ import {
   ListCertificatesOutputSchema,
   GetCertificateInputSchema,
   CertificateOutputSchema,
-  DownloadCertificatePdfOutputSchema,
+  IssueCertificateInputSchema,
+  UpdateCertificateStatusInputSchema,
 } from "./schema";
 
 export const listMineCertificatesContract = base
@@ -23,25 +24,38 @@ export const getCertificateContract = base
     method: "GET",
     path: "/certificates/{id}",
     summary: "Get certificate details",
-    description: "Retrieves full metadata of an official verification certificate.",
+    description: "Retrieves full metadata of an official verification certificate for an authorized viewer.",
     tags: ["Certificates"],
   })
   .input(GetCertificateInputSchema)
   .output(CertificateOutputSchema);
 
-export const downloadPdfContract = base
+export const issueCertificateContract = base
   .route({
-    method: "GET",
-    path: "/certificates/{id}/download-pdf",
-    summary: "Download prototype certificate PDF",
-    description: "Generates or retrieves a secure download URL for the prototype verification certificate PDF.",
+    method: "POST",
+    path: "/certificates/issue",
+    successStatus: 201,
+    summary: "Issue a certificate",
+    description: "Issues one certificate for a passed application: hashes the canonical payload, supersedes prior active certificates, and notifies the owner.",
     tags: ["Certificates"],
   })
-  .input(GetCertificateInputSchema)
-  .output(DownloadCertificatePdfOutputSchema);
+  .input(IssueCertificateInputSchema)
+  .output(CertificateOutputSchema);
+
+export const updateCertificateStatusContract = base
+  .route({
+    method: "PATCH",
+    path: "/certificates/{id}/status",
+    summary: "Update certificate status",
+    description: "Authorized, audited status change (suspend/cancel/revoke/supersede) with a required reason.",
+    tags: ["Certificates"],
+  })
+  .input(UpdateCertificateStatusInputSchema)
+  .output(CertificateOutputSchema);
 
 export const certificatesContract = {
   listMine: listMineCertificatesContract,
   get: getCertificateContract,
-  downloadPdf: downloadPdfContract,
+  issue: issueCertificateContract,
+  updateStatus: updateCertificateStatusContract,
 };

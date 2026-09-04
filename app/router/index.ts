@@ -1,4 +1,5 @@
 import { authRouter } from "@/modules/auth/server/router";
+import { businessesRouter } from "@/modules/businesses/server/router";
 import { mastersRouter } from "@/modules/masters/server/router";
 import { organizationsRouter } from "@/modules/organizations/server/router";
 import { instrumentsRouter } from "@/modules/instruments/server/router";
@@ -14,6 +15,7 @@ import { dashboardRouter } from "@/modules/dashboard/server/router";
 
 export const router = {
   auth: authRouter,
+  businesses: businessesRouter,
   masters: mastersRouter,
   organizations: organizationsRouter,
   instruments: instrumentsRouter,

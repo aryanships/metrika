@@ -11,10 +11,10 @@ import {
 
 export const recommendContract = base
   .route({
-    method: "POST",
+    method: "GET",
     path: "/scheduling/recommend",
-    summary: "Get candidate recommendations",
-    description: "Evaluates eligible LMOs and GATCs using deterministic multi-factor scoring.",
+    summary: "Recommend eligible LMO/GATC candidates",
+    description: "Evaluates eligible LMOs and GATCs for an application using deterministic multi-factor scoring.",
     tags: ["Scheduling"],
   })
   .input(RecommendCandidatesInputSchema)
@@ -24,7 +24,7 @@ export const assignContract = base
   .route({
     method: "POST",
     path: "/scheduling/assign",
-    summary: "Assign application to LMO or GATC",
+    summary: "Assign application to an LMO or GATC",
     description: "State admin confirms the route and creates a WorkOrder for the chosen assignee.",
     tags: ["Scheduling"],
   })
@@ -36,7 +36,7 @@ export const scheduleContract = base
     method: "POST",
     path: "/scheduling/schedule",
     summary: "Schedule inspection appointment",
-    description: "Sets confirmed appointment start and end windows for an assigned work order.",
+    description: "Sets the confirmed appointment window for an assigned work order and moves the application to SCHEDULED.",
     tags: ["Scheduling"],
   })
   .input(ScheduleAppointmentInputSchema)
@@ -47,7 +47,7 @@ export const listWorkOrdersContract = base
     method: "GET",
     path: "/scheduling/work-orders",
     summary: "List work orders",
-    description: "Lists assigned work orders for administrators and field personnel.",
+    description: "Lists assigned work orders for administrators (scoped) and field personnel (own work only).",
     tags: ["Scheduling"],
   })
   .input(ListWorkOrdersInputSchema)

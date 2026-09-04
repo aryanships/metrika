@@ -3,40 +3,43 @@ import { PaginationInputSchema, PaginationMetaSchema } from "@/schemas/shared";
 
 export const InstrumentStatusSchema = z.enum([
   "REGISTERED",
-  "VERIFICATION_PENDING",
+  "PENDING_VERIFICATION",
   "VERIFIED",
-  "REJECTED",
   "EXPIRING_SOON",
   "EXPIRED",
-  "DECOMMISSIONED",
+  "INACTIVE",
 ]);
 export type InstrumentStatus = z.infer<typeof InstrumentStatusSchema>;
 
+// Enriched with the two most-used reference names so the owner UI renders
+// readable type + location without issuing its own lookups.
 export const InstrumentOutputSchema = z.object({
   id: z.string(),
-  code: z.string(),
-  businessId: z.string(),
+  instrumentCode: z.string(),
   instrumentTypeId: z.string(),
+  instrumentTypeName: z.string(),
+  instrumentTypeUnit: z.string(),
+  businessId: z.string(),
   manufacturer: z.string(),
   model: z.string(),
   serialNumber: z.string(),
-  capacity: z.number(),
-  accuracyClass: z.string(),
-  purchaseDate: z.string(),
-  stateId: z.string(),
-  districtId: z.string(),
-  tehsilId: z.string().nullable().optional(),
-  villageId: z.string().nullable().optional(),
+  yearOfManufacture: z.number().int().nullable(),
+  purchaseDate: z.string().nullable(),
+  capacity: z.string().nullable(),
+  accuracyClass: z.string().nullable(),
   status: InstrumentStatusSchema,
-  currentCertificateId: z.string().nullable().optional(),
+  address: z.string(),
+  administrativeUnitId: z.string(),
+  administrativeUnitName: z.string(),
+  postalCode: z.string().nullable(),
+  latitude: z.string().nullable(),
+  longitude: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 export type InstrumentOutput = z.infer<typeof InstrumentOutputSchema>;
 
 export const ListInstrumentsInputSchema = PaginationInputSchema.extend({
-  businessId: z.string().optional(),
-  instrumentTypeId: z.string().optional(),
   status: InstrumentStatusSchema.optional(),
 });
 export type ListInstrumentsInput = z.infer<typeof ListInstrumentsInputSchema>;
@@ -52,26 +55,34 @@ export const CreateInstrumentInputSchema = z.object({
   manufacturer: z.string().min(1, "Manufacturer is required"),
   model: z.string().min(1, "Model is required"),
   serialNumber: z.string().min(1, "Serial number is required"),
-  capacity: z.number().positive("Capacity must be positive"),
+  capacity: z.string().min(1, "Capacity is required"),
   accuracyClass: z.string().min(1, "Accuracy class is required"),
-  purchaseDate: z.string().datetime(),
-  stateId: z.string().min(1, "State is required"),
-  districtId: z.string().min(1, "District is required"),
-  tehsilId: z.string().optional(),
-  villageId: z.string().optional(),
+  yearOfManufacture: z.number().int().min(1900).max(2100).optional(),
+  purchaseDate: z.string().datetime().optional(),
+  address: z.string().min(1, "Installation address is required"),
+  administrativeUnitId: z.string().min(1, "Location unit is required"),
+  postalCode: z.string().optional(),
+  latitude: z.string().optional(),
+  longitude: z.string().optional(),
 });
 export type CreateInstrumentInput = z.infer<typeof CreateInstrumentInputSchema>;
 
 export const UpdateInstrumentInputSchema = z.object({
   id: z.string().min(1, "Instrument ID is required"),
-  model: z.string().optional(),
-  tehsilId: z.string().optional(),
-  villageId: z.string().optional(),
+  capacity: z.string().min(1).optional(),
+  accuracyClass: z.string().min(1).optional(),
+  yearOfManufacture: z.number().int().min(1900).max(2100).optional(),
+  purchaseDate: z.string().datetime().optional(),
+  address: z.string().min(1).optional(),
+  administrativeUnitId: z.string().min(1).optional(),
+  postalCode: z.string().optional(),
+  latitude: z.string().optional(),
+  longitude: z.string().optional(),
 });
 export type UpdateInstrumentInput = z.infer<typeof UpdateInstrumentInputSchema>;
 
 export const GetInstrumentInputSchema = z.object({
-  id: z.string().min(1, "Instrument ID or code is required"),
+  id: z.string().min(1, "Instrument ID is required"),
 });
 export type GetInstrumentInput = z.infer<typeof GetInstrumentInputSchema>;
 
@@ -81,16 +92,31 @@ export const InstrumentPassportOutputSchema = z.object({
     .object({
       id: z.string(),
       certificateCode: z.string(),
-      validFrom: z.string(),
+      verifiedAt: z.string(),
       validUntil: z.string(),
       status: z.string(),
-      issuingAuthority: z.string(),
-      qrUrl: z.string(),
     })
-    .nullable()
-    .optional(),
+    .nullable(),
+  certificates: z.array(
+    z.object({
+      id: z.string(),
+      certificateCode: z.string(),
+      verifiedAt: z.string(),
+      validUntil: z.string(),
+      status: z.string(),
+    })
+  ),
+  applications: z.array(
+    z.object({
+      id: z.string(),
+      applicationCode: z.string(),
+      type: z.string(),
+      status: z.string(),
+      submittedAt: z.string().nullable(),
+      createdAt: z.string(),
+    })
+  ),
   applicationsCount: z.number().int(),
-  inspectionsCount: z.number().int(),
   certificatesCount: z.number().int(),
 });
 export type InstrumentPassportOutput = z.infer<typeof InstrumentPassportOutputSchema>;

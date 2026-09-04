@@ -1,12 +1,12 @@
 import { implement } from "@orpc/server";
 import { verificationContract } from "../contract";
 import { verificationService } from "./service";
+import type { AppContext } from "@/middleware/context";
 
-const implementer = implement(verificationContract);
+const implementer = implement(verificationContract).$context<AppContext>();
 
 export const verificationRouter = implementer.router({
-  verifyCertificate: implementer.verifyCertificate.handler(async ({ input, context }: any) => {
-    const ip = context?.headers?.get("x-forwarded-for") ?? undefined;
-    return verificationService.verifyCertificate(input, ip);
+  verifyCertificate: implementer.verifyCertificate.handler(async ({ input, context }) => {
+    return verificationService.verifyCertificate(input, context.clientIp ?? undefined);
   }),
 });

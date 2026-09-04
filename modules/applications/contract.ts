@@ -2,6 +2,7 @@ import { base } from "@/contracts/base";
 import {
   ListApplicationsInputSchema,
   ListApplicationsOutputSchema,
+  ListQueueInputSchema,
   CreateDraftApplicationInputSchema,
   UpdateDraftApplicationInputSchema,
   GetApplicationInputSchema,
@@ -10,7 +11,9 @@ import {
   ReviewActionInputSchema,
   RequestCorrectionsInputSchema,
   RejectApplicationInputSchema,
+  SetPriorityInputSchema,
   ApplicationOutputSchema,
+  CompletenessOutputSchema,
 } from "./schema";
 
 export const listMineApplicationsContract = base
@@ -24,6 +27,17 @@ export const listMineApplicationsContract = base
   .input(ListApplicationsInputSchema)
   .output(ListApplicationsOutputSchema);
 
+export const listQueueContract = base
+  .route({
+    method: "GET",
+    path: "/applications/queue",
+    summary: "List admin review queue",
+    description: "Filters and paginates applications for the admin review queue, scoped to the admin's jurisdiction.",
+    tags: ["Applications"],
+  })
+  .input(ListQueueInputSchema)
+  .output(ListApplicationsOutputSchema);
+
 export const getApplicationContract = base
   .route({
     method: "GET",
@@ -34,6 +48,17 @@ export const getApplicationContract = base
   })
   .input(GetApplicationInputSchema)
   .output(ApplicationOutputSchema);
+
+export const getCompletenessContract = base
+  .route({
+    method: "GET",
+    path: "/applications/{id}/completeness",
+    summary: "Check application completeness",
+    description: "Returns a per-requirement checklist used to gate submission.",
+    tags: ["Applications"],
+  })
+  .input(GetApplicationInputSchema)
+  .output(CompletenessOutputSchema);
 
 export const createDraftApplicationContract = base
   .route({
@@ -124,9 +149,22 @@ export const rejectApplicationContract = base
   .input(RejectApplicationInputSchema)
   .output(ApplicationOutputSchema);
 
+export const setPriorityContract = base
+  .route({
+    method: "POST",
+    path: "/applications/{id}/priority",
+    summary: "Set application priority",
+    description: "Changes an open application's priority.",
+    tags: ["Applications"],
+  })
+  .input(SetPriorityInputSchema)
+  .output(ApplicationOutputSchema);
+
 export const applicationsContract = {
   listMine: listMineApplicationsContract,
+  listQueue: listQueueContract,
   get: getApplicationContract,
+  completeness: getCompletenessContract,
   createDraft: createDraftApplicationContract,
   updateDraft: updateDraftApplicationContract,
   submit: submitApplicationContract,
@@ -135,4 +173,5 @@ export const applicationsContract = {
   requestCorrections: requestCorrectionsContract,
   approve: approveApplicationContract,
   reject: rejectApplicationContract,
+  setPriority: setPriorityContract,
 };

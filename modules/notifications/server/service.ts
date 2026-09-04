@@ -1,4 +1,7 @@
-import { notificationsRepository, NotificationRecord } from "./repository";
+import { ORPCError } from "@orpc/server";
+import { db } from "@/prisma/db";
+import { paginationMeta } from "@/schemas/shared";
+import type { AppUser } from "@/middleware/context";
 import {
   ListNotificationsInput,
   ListNotificationsOutput,
@@ -7,55 +10,62 @@ import {
   NotificationOutput,
 } from "../schema";
 
-function toSafeNotificationOutput(rec: NotificationRecord): NotificationOutput {
+type Orm = typeof db.orm.public;
+type NotificationRow = NonNullable<Awaited<ReturnType<Orm["Notification"]["first"]>>>;
+
+function titleFor(row: NotificationRow): string {
+  const payload = (row.payload ?? {}) as Record<string, unknown>;
+  return typeof payload.title === "string" ? payload.title : row.event.replaceAll("_", " ").toLowerCase();
+}
+
+function messageFor(row: NotificationRow): string {
+  const payload = (row.payload ?? {}) as Record<string, unknown>;
+  return typeof payload.message === "string" ? payload.message : "";
+}
+
+function toOutput(row: NotificationRow): NotificationOutput {
   return {
-    id: rec.id,
-    userId: rec.userId,
-    type: rec.type as any,
-    title: rec.title,
-    message: rec.message,
-    linkUrl: rec.linkUrl ?? null,
-    isRead: rec.isRead,
-    createdAt: rec.createdAt.toISOString(),
+    id: row.id,
+    event: row.event,
+    title: titleFor(row),
+    message: messageFor(row),
+    certificateId: row.certificateId,
+    isRead: row.readAt !== null,
+    createdAt: row.createdAt,
   };
 }
 
 export const notificationsService = {
-  async listMine(
-    input: ListNotificationsInput,
-    userId = "usr_demo"
-  ): Promise<ListNotificationsOutput> {
-    const mock: NotificationRecord = {
-      id: "notif_demo_1",
-      userId,
-      type: "CERTIFICATE_ISSUED",
-      title: "Verification Certificate Issued",
-      message: "Certificate CERT-DL-2024-0042 has been issued for instrument IND-DL-NAWI-2024-0089.",
-      linkUrl: "/certificates/cert_demo_1",
-      isRead: false,
-      createdAt: new Date(),
-    };
+  async listMine(input: ListNotificationsInput, user: AppUser): Promise<ListNotificationsOutput> {
+    const page = input.page ?? 1;
+    const limit = input.limit ?? 20;
+
+    let query = db.orm.public.Notification.where({ userId: user.id, channel: "IN_APP" });
+    if (input.unreadOnly) query = query.where((n) => n.readAt.isNull());
+
+    const [rows, totals, unread] = await Promise.all([
+      query.orderBy((n) => n.createdAt.desc()).offset((page - 1) * limit).limit(limit).all(),
+      query.aggregate((agg) => ({ total: agg.count() })),
+      db.orm.public.Notification.where({ userId: user.id, channel: "IN_APP" })
+        .where((n) => n.readAt.isNull())
+        .aggregate((agg) => ({ total: agg.count() })),
+    ]);
 
     return {
-      items: [toSafeNotificationOutput(mock)],
-      pagination: {
-        page: input.page ?? 1,
-        limit: input.limit ?? 20,
-        total: 1,
-        totalPages: 1,
-        hasMore: false,
-        nextCursor: null,
-      },
-      unreadCount: 1,
+      items: rows.map(toOutput),
+      pagination: paginationMeta(totals.total, page, limit),
+      unreadCount: unread.total,
     };
   },
 
-  async markRead(input: MarkNotificationReadInput, userId = "usr_demo"): Promise<MarkNotificationReadOutput> {
-    await notificationsRepository.markAsRead(input.id, userId);
-    return {
-      success: true,
-      id: input.id,
-      isRead: true,
-    };
+  async markRead(input: MarkNotificationReadInput, user: AppUser): Promise<MarkNotificationReadOutput> {
+    const row = await db.orm.public.Notification.where({ id: input.id, userId: user.id }).first();
+    if (!row) {
+      throw new ORPCError("NOT_FOUND", { data: { resourceType: "Notification", resourceId: input.id } });
+    }
+    if (!row.readAt) {
+      await db.orm.public.Notification.where({ id: row.id }).update({ readAt: new Date().toISOString() });
+    }
+    return { success: true, id: row.id, isRead: true };
   },
 };

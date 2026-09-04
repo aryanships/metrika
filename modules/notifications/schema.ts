@@ -1,25 +1,12 @@
 import { z } from "zod";
 import { PaginationInputSchema, PaginationMetaSchema } from "@/schemas/shared";
 
-export const NotificationTypeSchema = z.enum([
-  "APPLICATION_STATUS",
-  "APPOINTMENT_SCHEDULED",
-  "CERTIFICATE_ISSUED",
-  "CERTIFICATE_EXPIRING_90",
-  "CERTIFICATE_EXPIRING_60",
-  "CERTIFICATE_EXPIRING_30",
-  "CERTIFICATE_EXPIRED",
-  "SYSTEM_ANNOUNCEMENT",
-]);
-export type NotificationType = z.infer<typeof NotificationTypeSchema>;
-
 export const NotificationOutputSchema = z.object({
   id: z.string(),
-  userId: z.string(),
-  type: NotificationTypeSchema,
+  event: z.string(),
   title: z.string(),
   message: z.string(),
-  linkUrl: z.string().nullable().optional(),
+  certificateId: z.string().nullable(),
   isRead: z.boolean(),
   createdAt: z.string(),
 });

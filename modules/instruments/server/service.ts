@@ -1,155 +1,234 @@
-import { instrumentsRepository, InstrumentRecord } from "./repository";
+import { randomBytes } from "node:crypto";
+import { ORPCError } from "@orpc/server";
+import { db } from "@/prisma/db";
+import { paginationMeta } from "@/schemas/shared";
 import {
-  ListInstrumentsInput,
-  ListInstrumentsOutput,
   CreateInstrumentInput,
-  UpdateInstrumentInput,
   GetInstrumentInput,
   InstrumentOutput,
   InstrumentPassportOutput,
+  ListInstrumentsInput,
+  ListInstrumentsOutput,
+  UpdateInstrumentInput,
 } from "../schema";
 
-function toSafeInstrumentOutput(rec: InstrumentRecord): InstrumentOutput {
+type Orm = typeof db.orm.public;
+
+function notFound(resourceId: string): never {
+  throw new ORPCError("NOT_FOUND", { data: { resourceType: "Instrument", resourceId } });
+}
+
+function conflict(field: string, message: string): never {
+  throw new ORPCError("CONFLICT", { data: { field, message } });
+}
+
+function validation(path: string, message: string): never {
+  throw new ORPCError("VALIDATION_ERROR", { data: { issues: [{ path, message }] } });
+}
+
+// ponytail: random suffix + uniqueness check is enough for the demo; a DB
+// sequence would only be needed at registration rates that don't apply here.
+function generateInstrumentCode(): string {
+  const year = new Date().getFullYear();
+  const suffix = randomBytes(3).toString("hex").toUpperCase();
+  return `DMI-${year}-${suffix}`;
+}
+
+async function nextInstrumentCode(orm: Orm): Promise<string> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = generateInstrumentCode();
+    const existing = await orm.Instrument.where({ instrumentCode: code }).first();
+    if (!existing) return code;
+  }
+  throw conflict("instrumentCode", "Unable to allocate a unique instrument code");
+}
+
+type InstrumentRow = Awaited<ReturnType<Orm["Instrument"]["first"]>>;
+
+function toOutput(
+  row: NonNullable<InstrumentRow>,
+  type: { name: string; unit: string } | null,
+  unit: { name: string } | null,
+): InstrumentOutput {
   return {
-    id: rec.id,
-    code: rec.code,
-    businessId: rec.businessId,
-    instrumentTypeId: rec.instrumentTypeId,
-    manufacturer: rec.manufacturer,
-    model: rec.model,
-    serialNumber: rec.serialNumber,
-    capacity: rec.capacity,
-    accuracyClass: rec.accuracyClass,
-    purchaseDate: rec.purchaseDate.toISOString(),
-    stateId: rec.stateId,
-    districtId: rec.districtId,
-    tehsilId: rec.tehsilId ?? null,
-    villageId: rec.villageId ?? null,
-    status: rec.status,
-    currentCertificateId: rec.currentCertificateId ?? null,
-    createdAt: rec.createdAt.toISOString(),
-    updatedAt: rec.updatedAt.toISOString(),
+    id: row.id,
+    instrumentCode: row.instrumentCode,
+    instrumentTypeId: row.instrumentTypeId,
+    instrumentTypeName: type?.name ?? "",
+    instrumentTypeUnit: type?.unit ?? "",
+    businessId: row.businessId,
+    manufacturer: row.manufacturer,
+    model: row.model,
+    serialNumber: row.serialNumber,
+    yearOfManufacture: row.yearOfManufacture,
+    purchaseDate: row.purchaseDate,
+    capacity: row.capacity,
+    accuracyClass: row.accuracyClass,
+    status: row.status,
+    address: row.address,
+    administrativeUnitId: row.administrativeUnitId,
+    administrativeUnitName: unit?.name ?? "",
+    postalCode: row.postalCode,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 
-export const instrumentsService = {
-  async list(input: ListInstrumentsInput): Promise<ListInstrumentsOutput> {
-    const mock: InstrumentRecord = {
-      id: "inst_demo_1",
-      code: "IND-DL-NAWI-2024-0089",
-      businessId: "biz_demo",
-      instrumentTypeId: "it_weighing_scale",
-      manufacturer: "Essae-Teraoka",
-      model: "DS-215",
-      serialNumber: "SN-9841203",
-      capacity: 30,
-      accuracyClass: "Class III",
-      purchaseDate: new Date("2023-05-15"),
-      stateId: "unit_demo_state",
-      districtId: "unit_demo_dist",
-      status: "VERIFIED",
-      currentCertificateId: "cert_demo_1",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+async function resolveRefs(orm: Orm, instrumentTypeId: string, administrativeUnitId: string) {
+  const [type, unit] = await Promise.all([
+    orm.InstrumentType.first({ id: instrumentTypeId }),
+    orm.AdministrativeUnit.first({ id: administrativeUnitId }),
+  ]);
+  return { type, unit };
+}
 
-    return {
-      items: [toSafeInstrumentOutput(mock)],
-      pagination: {
-        page: input.page ?? 1,
-        limit: input.limit ?? 20,
-        total: 1,
-        totalPages: 1,
-        hasMore: false,
-        nextCursor: null,
-      },
-    };
+async function toEnrichedOutput(orm: Orm, row: NonNullable<InstrumentRow>): Promise<InstrumentOutput> {
+  const { type, unit } = await resolveRefs(orm, row.instrumentTypeId, row.administrativeUnitId);
+  return toOutput(row, type, unit);
+}
+
+export const instrumentsService = {
+  async list(input: ListInstrumentsInput, businessId: string | null): Promise<ListInstrumentsOutput> {
+    const page = input.page ?? 1;
+    const limit = input.limit ?? 20;
+
+    if (!businessId) {
+      return { items: [], pagination: paginationMeta(0, page, limit) };
+    }
+
+    let query = db.orm.public.Instrument.where({ businessId });
+    if (input.status) query = query.where({ status: input.status });
+
+    const [rows, totals] = await Promise.all([
+      query.orderBy((i) => i.createdAt.desc()).offset((page - 1) * limit).limit(limit).all(),
+      query.aggregate((agg) => ({ total: agg.count() })),
+    ]);
+
+    const typeIds = [...new Set(rows.map((r) => r.instrumentTypeId))];
+    const unitIds = [...new Set(rows.map((r) => r.administrativeUnitId))];
+    const [types, units] = await Promise.all([
+      db.orm.public.InstrumentType.where((t) => t.id.in(typeIds)).all(),
+      db.orm.public.AdministrativeUnit.where((u) => u.id.in(unitIds)).all(),
+    ]);
+    const typeById = new Map(types.map((t) => [t.id, t]));
+    const unitById = new Map(units.map((u) => [u.id, u]));
+
+    const items = rows.map((row) => toOutput(row, typeById.get(row.instrumentTypeId) ?? null, unitById.get(row.administrativeUnitId) ?? null));
+
+    return { items, pagination: paginationMeta(totals.total, page, limit) };
   },
 
   async get(input: GetInstrumentInput): Promise<InstrumentOutput> {
-    const mock: InstrumentRecord = {
-      id: input.id,
-      code: "IND-DL-NAWI-2024-0089",
-      businessId: "biz_demo",
-      instrumentTypeId: "it_weighing_scale",
-      manufacturer: "Essae-Teraoka",
-      model: "DS-215",
-      serialNumber: "SN-9841203",
-      capacity: 30,
-      accuracyClass: "Class III",
-      purchaseDate: new Date("2023-05-15"),
-      stateId: "unit_demo_state",
-      districtId: "unit_demo_dist",
-      status: "VERIFIED",
-      currentCertificateId: "cert_demo_1",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    return toSafeInstrumentOutput(mock);
+    const row = await db.orm.public.Instrument.first({ id: input.id });
+    if (!row) notFound(input.id);
+    return toEnrichedOutput(db.orm.public, row);
   },
 
-  async create(input: CreateInstrumentInput, businessId = "biz_demo"): Promise<InstrumentOutput> {
-    const code = `IND-${input.stateId}-${Date.now().toString().slice(-6)}`;
-    const created = await instrumentsRepository.createInstrument({
-      code,
-      businessId,
+  async create(input: CreateInstrumentInput, businessId: string | null): Promise<InstrumentOutput> {
+    if (!businessId) validation("businessId", "Create a business profile before registering instruments");
+
+    const [type, unit] = await Promise.all([
+      db.orm.public.InstrumentType.first({ id: input.instrumentTypeId }),
+      db.orm.public.AdministrativeUnit.first({ id: input.administrativeUnitId }),
+    ]);
+    if (!type) notFound(input.instrumentTypeId);
+    if (!unit) notFound(input.administrativeUnitId);
+
+    const duplicate = await db.orm.public.Instrument.where({
       instrumentTypeId: input.instrumentTypeId,
+      manufacturer: input.manufacturer,
+      serialNumber: input.serialNumber,
+    }).first();
+    if (duplicate) {
+      conflict("serialNumber", "An instrument of this type with this manufacturer and serial number is already registered");
+    }
+
+    const instrumentCode = await nextInstrumentCode(db.orm.public);
+
+    const row = await db.orm.public.Instrument.create({
+      instrumentCode,
+      instrumentTypeId: input.instrumentTypeId,
+      businessId,
       manufacturer: input.manufacturer,
       model: input.model,
       serialNumber: input.serialNumber,
+      yearOfManufacture: input.yearOfManufacture ?? null,
+      purchaseDate: input.purchaseDate ?? null,
       capacity: input.capacity,
       accuracyClass: input.accuracyClass,
-      purchaseDate: new Date(input.purchaseDate),
-      stateId: input.stateId,
-      districtId: input.districtId,
-      tehsilId: input.tehsilId ?? null,
-      villageId: input.villageId ?? null,
       status: "REGISTERED",
-      currentCertificateId: null,
+      address: input.address,
+      administrativeUnitId: input.administrativeUnitId,
+      postalCode: input.postalCode ?? null,
+      latitude: input.latitude ?? null,
+      longitude: input.longitude ?? null,
     });
-    return toSafeInstrumentOutput(created);
+
+    return toOutput(row, type, unit);
   },
 
   async update(input: UpdateInstrumentInput): Promise<InstrumentOutput> {
-    const mock: InstrumentRecord = {
-      id: input.id,
-      code: "IND-DL-NAWI-2024-0089",
-      businessId: "biz_demo",
-      instrumentTypeId: "it_weighing_scale",
-      manufacturer: "Essae-Teraoka",
-      model: input.model ?? "DS-215",
-      serialNumber: "SN-9841203",
-      capacity: 30,
-      accuracyClass: "Class III",
-      purchaseDate: new Date("2023-05-15"),
-      stateId: "unit_demo_state",
-      districtId: "unit_demo_dist",
-      tehsilId: input.tehsilId ?? null,
-      villageId: input.villageId ?? null,
-      status: "VERIFIED",
-      currentCertificateId: "cert_demo_1",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    return toSafeInstrumentOutput(mock);
+    const row = await db.orm.public.Instrument.first({ id: input.id });
+    if (!row) notFound(input.id);
+
+    if (input.administrativeUnitId && input.administrativeUnitId !== row.administrativeUnitId) {
+      const unit = await db.orm.public.AdministrativeUnit.first({ id: input.administrativeUnitId });
+      if (!unit) notFound(input.administrativeUnitId);
+    }
+
+    await db.orm.public.Instrument.where({ id: input.id }).update({
+      capacity: input.capacity,
+      accuracyClass: input.accuracyClass,
+      yearOfManufacture: input.yearOfManufacture,
+      purchaseDate: input.purchaseDate,
+      address: input.address,
+      administrativeUnitId: input.administrativeUnitId,
+      postalCode: input.postalCode,
+      latitude: input.latitude,
+      longitude: input.longitude,
+    });
+
+    return this.get({ id: input.id });
   },
 
   async passport(input: GetInstrumentInput): Promise<InstrumentPassportOutput> {
-    const instrument = await this.get(input);
+    const row = await db.orm.public.Instrument.first({ id: input.id });
+    if (!row) notFound(input.id);
+
+    const [instrument, certificates, applications] = await Promise.all([
+      toEnrichedOutput(db.orm.public, row),
+      db.orm.public.Certificate.where({ instrumentId: input.id })
+        .orderBy((c) => c.verifiedAt.desc())
+        .all(),
+      db.orm.public.Application.where({ instrumentId: input.id })
+        .orderBy((a) => a.createdAt.desc())
+        .all(),
+    ]);
+
+    const certificateSummary = (c: (typeof certificates)[number]) => ({
+      id: c.id,
+      certificateCode: c.certificateCode,
+      verifiedAt: c.verifiedAt,
+      validUntil: c.validUntil,
+      status: c.status,
+    });
+
     return {
       instrument,
-      activeCertificate: {
-        id: "cert_demo_1",
-        certificateCode: "CERT-DL-2024-0042",
-        validFrom: new Date("2024-01-10").toISOString(),
-        validUntil: new Date("2025-01-09").toISOString(),
-        status: "ACTIVE",
-        issuingAuthority: "Legal Metrology Department, Delhi",
-        qrUrl: `/verify/c/CERT-DL-2024-0042`,
-      },
-      applicationsCount: 1,
-      inspectionsCount: 1,
-      certificatesCount: 1,
+      activeCertificate: certificates[0] ? certificateSummary(certificates[0]) : null,
+      certificates: certificates.map(certificateSummary),
+      applications: applications.map((a) => ({
+        id: a.id,
+        applicationCode: a.applicationCode,
+        type: a.type,
+        status: a.status,
+        submittedAt: a.submittedAt,
+        createdAt: a.createdAt,
+      })),
+      applicationsCount: applications.length,
+      certificatesCount: certificates.length,
     };
   },
 };

@@ -1,4 +1,5 @@
 import { authContract } from "@/modules/auth/contract";
+import { businessesContract } from "@/modules/businesses/contract";
 import { mastersContract } from "@/modules/masters/contract";
 import { organizationsContract } from "@/modules/organizations/contract";
 import { instrumentsContract } from "@/modules/instruments/contract";
@@ -14,6 +15,7 @@ import { dashboardContract } from "@/modules/dashboard/contract";
 
 export const appContract = {
   auth: authContract,
+  businesses: businessesContract,
   masters: mastersContract,
   organizations: organizationsContract,
   instruments: instrumentsContract,

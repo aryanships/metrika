@@ -806,6 +806,7 @@ model Notification {
   status        NotificationStatus  @default(PENDING)
   createdAt     TimestamptzString   @default(now())
   sentAt        TimestamptzString?
+  readAt        TimestamptzString?
 
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   certificate Certificate? @relation(fields: [certificateId], references: [id], onDelete: Cascade, onUpdate: Cascade)

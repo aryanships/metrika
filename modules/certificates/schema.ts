@@ -1,23 +1,44 @@
 import { z } from "zod";
 import { PaginationInputSchema, PaginationMetaSchema } from "@/schemas/shared";
 
-export const CertificateStatusSchema = z.enum(["ACTIVE", "EXPIRING_SOON", "EXPIRED", "REVOKED", "SUPERSEDED"]);
+export const CertificateStatusSchema = z.enum([
+  "ACTIVE",
+  "EXPIRING_SOON",
+  "EXPIRED",
+  "SUSPENDED",
+  "CANCELLED",
+  "REVOKED",
+  "SUPERSEDED",
+]);
 export type CertificateStatus = z.infer<typeof CertificateStatusSchema>;
+
+export const CertificateInstrumentSchema = z.object({
+  code: z.string(),
+  typeName: z.string(),
+  unit: z.string(),
+  manufacturer: z.string(),
+  model: z.string(),
+  serialNumber: z.string(),
+  capacity: z.string().nullable(),
+  accuracyClass: z.string().nullable(),
+});
 
 export const CertificateOutputSchema = z.object({
   id: z.string(),
   certificateCode: z.string(),
   applicationId: z.string(),
   instrumentId: z.string(),
-  issuedAt: z.string(),
-  validFrom: z.string(),
+  verifiedAt: z.string(),
   validUntil: z.string(),
   status: CertificateStatusSchema,
   issuingAuthority: z.string(),
   payloadHash: z.string(),
-  fileId: z.string().nullable().optional(),
+  ruleVersionId: z.string().nullable(),
+  fileId: z.string().nullable(),
   qrUrl: z.string(),
   createdAt: z.string(),
+  instrument: CertificateInstrumentSchema,
+  businessName: z.string(),
 });
 export type CertificateOutput = z.infer<typeof CertificateOutputSchema>;
 
@@ -38,9 +59,14 @@ export const GetCertificateInputSchema = z.object({
 });
 export type GetCertificateInput = z.infer<typeof GetCertificateInputSchema>;
 
-export const DownloadCertificatePdfOutputSchema = z.object({
-  downloadUrl: z.string().url(),
-  filename: z.string(),
-  expiresAt: z.string(),
+export const IssueCertificateInputSchema = z.object({
+  applicationId: z.string().min(1, "Application ID is required"),
 });
-export type DownloadCertificatePdfOutput = z.infer<typeof DownloadCertificatePdfOutputSchema>;
+export type IssueCertificateInput = z.infer<typeof IssueCertificateInputSchema>;
+
+export const UpdateCertificateStatusInputSchema = z.object({
+  id: z.string().min(1, "Certificate ID is required"),
+  status: z.enum(["SUSPENDED", "CANCELLED", "REVOKED", "SUPERSEDED"]),
+  reason: z.string().min(1, "A reason is required for this status change"),
+});
+export type UpdateCertificateStatusInput = z.infer<typeof UpdateCertificateStatusInputSchema>;

@@ -4,42 +4,67 @@
  * Other modules MUST NEVER import this repository directly.
  * Instead, call the exposed methods in `modules/applications/server/service.ts` or procedures.
  */
+import { db } from "@/prisma/db";
+import type {
+  ApplicationStatus,
+  ApplicationType,
+  Priority,
+  VerificationRoute,
+} from "../schema";
 
-export interface ApplicationRecord {
-  id: string;
-  applicationNumber: string;
-  businessId: string;
+export type Orm = typeof db.orm;
+
+export interface CreateApplicationData {
+  applicationCode: string;
   instrumentId: string;
-  type: string;
-  status: string;
-  preferredDateStart?: Date | null;
-  preferredDateEnd?: Date | null;
-  submittedAt?: Date | null;
-  reviewedById?: string | null;
-  reviewNotes?: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  type: ApplicationType;
+  status: ApplicationStatus;
+  route: VerificationRoute | null;
+  priority: Priority;
+  targetCertificateId: string | null;
+  requestedChanges: Record<string, unknown> | null;
+  preferredStartAt: string | null;
+  preferredEndAt: string | null;
+  submittedAt: string | null;
+}
+
+export interface UpdateApplicationData {
+  status?: ApplicationStatus;
+  priority?: Priority;
+  preferredStartAt?: string | null;
+  preferredEndAt?: string | null;
+  submittedAt?: string | null;
+}
+
+export interface CreateStatusHistoryData {
+  applicationId: string;
+  fromStatus: ApplicationStatus | null;
+  toStatus: ApplicationStatus;
+  changedById: string | null;
+  reason: string | null;
 }
 
 export const applicationsRepository = {
-  async list() {
-    return [];
+  findById(id: string, orm: Orm = db.orm) {
+    return orm.public.Application.first({ id });
   },
 
-  async findById(id: string): Promise<ApplicationRecord | null> {
-    return null;
+  findOpenForInstrument(instrumentId: string, orm: Orm = db.orm) {
+    return orm.public.Application.where({ instrumentId }).all();
   },
 
-  async create(data: Omit<ApplicationRecord, "id" | "createdAt" | "updatedAt">): Promise<ApplicationRecord> {
-    return {
-      id: `app_${Date.now()}`,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+  create(data: CreateApplicationData, orm: Orm = db.orm) {
+    return orm.public.Application.create({
       ...data,
-    };
+      requestedChanges: data.requestedChanges as never,
+    });
   },
 
-  async update(id: string, data: Partial<ApplicationRecord>): Promise<ApplicationRecord | null> {
-    return null;
+  update(id: string, data: UpdateApplicationData, orm: Orm = db.orm) {
+    return orm.public.Application.where({ id }).update(data);
+  },
+
+  createStatusHistory(data: CreateStatusHistoryData, orm: Orm = db.orm) {
+    return orm.public.ApplicationStatusHistory.create(data);
   },
 };

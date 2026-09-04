@@ -5,7 +5,7 @@ export const ApplicationTypeSchema = z.enum([
   "INITIAL_VERIFICATION",
   "RE_VERIFICATION",
   "POST_REPAIR_VERIFICATION",
-  "RELOCATION_VERIFICATION",
+  "RELOCATION_RE_VERIFICATION",
   "OWNERSHIP_TRANSFER",
   "CERTIFICATE_CORRECTION",
   "DUPLICATE_CERTIFICATE",
@@ -16,30 +16,39 @@ export const ApplicationStatusSchema = z.enum([
   "DRAFT",
   "SUBMITTED",
   "UNDER_REVIEW",
-  "CORRECTION_REQUIRED",
+  "DOCUMENTS_REQUIRED",
   "APPROVED",
   "SCHEDULED",
-  "IN_PROGRESS",
+  "VERIFICATION_IN_PROGRESS",
   "PASSED",
   "FAILED",
-  "CERTIFICATE_ISSUED",
+  "CERTIFICATE_GENERATED",
   "REJECTED",
   "CANCELLED",
 ]);
 export type ApplicationStatus = z.infer<typeof ApplicationStatusSchema>;
 
+export const VerificationRouteSchema = z.enum(["LMO", "GATC"]);
+export type VerificationRoute = z.infer<typeof VerificationRouteSchema>;
+
+export const PrioritySchema = z.enum(["LOW", "MEDIUM", "HIGH"]);
+export type Priority = z.infer<typeof PrioritySchema>;
+
+export const RequestedChangesSchema = z.record(z.string(), z.unknown());
+
 export const ApplicationOutputSchema = z.object({
   id: z.string(),
-  applicationNumber: z.string(),
-  businessId: z.string(),
+  applicationCode: z.string(),
   instrumentId: z.string(),
+  instrumentCode: z.string(),
   type: ApplicationTypeSchema,
   status: ApplicationStatusSchema,
-  preferredDateStart: z.string().nullable().optional(),
-  preferredDateEnd: z.string().nullable().optional(),
-  submittedAt: z.string().nullable().optional(),
-  reviewedById: z.string().nullable().optional(),
-  reviewNotes: z.string().nullable().optional(),
+  route: VerificationRouteSchema.nullable(),
+  priority: PrioritySchema,
+  targetCertificateId: z.string().nullable(),
+  preferredStartAt: z.string().nullable(),
+  preferredEndAt: z.string().nullable(),
+  submittedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -49,7 +58,6 @@ export const ListApplicationsInputSchema = PaginationInputSchema.extend({
   status: ApplicationStatusSchema.optional(),
   type: ApplicationTypeSchema.optional(),
   instrumentId: z.string().optional(),
-  districtId: z.string().optional(),
 });
 export type ListApplicationsInput = z.infer<typeof ListApplicationsInputSchema>;
 
@@ -59,18 +67,28 @@ export const ListApplicationsOutputSchema = z.object({
 });
 export type ListApplicationsOutput = z.infer<typeof ListApplicationsOutputSchema>;
 
+export const ListQueueInputSchema = PaginationInputSchema.extend({
+  status: ApplicationStatusSchema.optional(),
+  type: ApplicationTypeSchema.optional(),
+  priority: PrioritySchema.optional(),
+  districtId: z.string().optional(),
+});
+export type ListQueueInput = z.infer<typeof ListQueueInputSchema>;
+
 export const CreateDraftApplicationInputSchema = z.object({
   instrumentId: z.string().min(1, "Instrument ID is required"),
   type: ApplicationTypeSchema,
-  preferredDateStart: z.string().datetime().optional(),
-  preferredDateEnd: z.string().datetime().optional(),
+  targetCertificateId: z.string().optional(),
+  requestedChanges: RequestedChangesSchema.optional(),
+  preferredStartAt: z.string().datetime().optional(),
+  preferredEndAt: z.string().datetime().optional(),
 });
 export type CreateDraftApplicationInput = z.infer<typeof CreateDraftApplicationInputSchema>;
 
 export const UpdateDraftApplicationInputSchema = z.object({
   id: z.string().min(1, "Application ID is required"),
-  preferredDateStart: z.string().datetime().optional(),
-  preferredDateEnd: z.string().datetime().optional(),
+  preferredStartAt: z.string().datetime().optional(),
+  preferredEndAt: z.string().datetime().optional(),
 });
 export type UpdateDraftApplicationInput = z.infer<typeof UpdateDraftApplicationInputSchema>;
 
@@ -107,3 +125,21 @@ export const RejectApplicationInputSchema = z.object({
   reason: z.string().min(5, "Rejection reason is required"),
 });
 export type RejectApplicationInput = z.infer<typeof RejectApplicationInputSchema>;
+
+export const SetPriorityInputSchema = z.object({
+  id: z.string().min(1, "Application ID is required"),
+  priority: PrioritySchema,
+});
+export type SetPriorityInput = z.infer<typeof SetPriorityInputSchema>;
+
+export const CompletenessCheckSchema = z.object({
+  label: z.string(),
+  passed: z.boolean(),
+});
+export type CompletenessCheck = z.infer<typeof CompletenessCheckSchema>;
+
+export const CompletenessOutputSchema = z.object({
+  complete: z.boolean(),
+  checks: z.array(CompletenessCheckSchema),
+});
+export type CompletenessOutput = z.infer<typeof CompletenessOutputSchema>;

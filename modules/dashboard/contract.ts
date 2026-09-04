@@ -1,8 +1,5 @@
 import { base } from "@/contracts/base";
-import {
-  GetDashboardStatsInputSchema,
-  DashboardStatsOutputSchema,
-} from "./schema";
+import { GetDashboardStatsInputSchema, DashboardStatsOutputSchema } from "./schema";
 
 export const getStatsContract = base
   .route({

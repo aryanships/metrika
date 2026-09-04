@@ -1,34 +1,74 @@
-import { verificationRepository } from "./repository";
-import { VerifyCertificateInput, PublicVerificationOutput } from "../schema";
+import { ORPCError } from "@orpc/server";
+import { db } from "@/prisma/db";
+import type { VerifyCertificateInput, PublicVerificationOutput } from "../schema";
+
+type Orm = typeof db.orm.public;
+type CertificateRow = NonNullable<Awaited<ReturnType<Orm["Certificate"]["first"]>>>;
+
+async function issuingAuthorityFor(unitId: string): Promise<string> {
+  let unit = await db.orm.public.AdministrativeUnit.first({ id: unitId });
+  while (unit && unit.type !== "STATE") {
+    unit = unit.parentId ? await db.orm.public.AdministrativeUnit.first({ id: unit.parentId }) : null;
+  }
+  return unit ? `Legal Metrology Department, ${unit.name}` : "Legal Metrology Department";
+}
+
+async function findCertificate(query: string): Promise<CertificateRow | null> {
+  const byCode = await db.orm.public.Certificate.where({ certificateCode: query }).first();
+  if (byCode) return byCode;
+
+  const instrument = await db.orm.public.Instrument.where({ instrumentCode: query }).first();
+  if (!instrument) return null;
+  return db.orm.public.Certificate.where({ instrumentId: instrument.id })
+    .orderBy((c) => c.verifiedAt.desc())
+    .first();
+}
 
 export const verificationService = {
   async verifyCertificate(
     input: VerifyCertificateInput,
-    ipAddress?: string
+    ipAddress?: string,
   ): Promise<PublicVerificationOutput> {
-    await verificationRepository.logVerification({
-      certificateCode: input.certificateCode,
-      matched: true,
+    const certificate = await findCertificate(input.certificateCode.trim());
+    if (!certificate) {
+      throw new ORPCError("NOT_FOUND", { data: { resourceType: "Certificate", resourceId: input.certificateCode } });
+    }
+
+    const instrument = await db.orm.public.Instrument.first({ id: certificate.instrumentId });
+    const type = instrument
+      ? await db.orm.public.InstrumentType.first({ id: instrument.instrumentTypeId })
+      : null;
+    const issuingAuthority = instrument
+      ? await issuingAuthorityFor(instrument.administrativeUnitId)
+      : "Legal Metrology Department";
+
+    const now = Date.now();
+    const active = certificate.status === "ACTIVE" || certificate.status === "EXPIRING_SOON";
+    const valid = active && Date.parse(certificate.validUntil) > now;
+
+    await db.orm.public.CertificateVerification.create({
+      certificateId: certificate.id,
       ipAddress: ipAddress ?? null,
-      userAgent: null,
+      presentedPayloadHash: null,
+      matched: valid,
     });
 
-    // SECURITY: Safe public payload only - strictly NO owner phone, email, private address, or documents
     return {
-      valid: true,
-      certificateCode: input.certificateCode,
-      status: "ACTIVE",
-      issuedAt: new Date("2024-01-10").toISOString(),
-      validUntil: new Date("2025-01-09").toISOString(),
-      issuingAuthority: "Legal Metrology Department, Delhi",
+      valid,
+      certificateCode: certificate.certificateCode,
+      status: certificate.status,
+      verifiedAt: certificate.verifiedAt,
+      validUntil: certificate.validUntil,
+      issuingAuthority,
       instrument: {
-        code: "IND-DL-NAWI-2024-0089",
-        category: "MASS",
-        manufacturer: "Essae-Teraoka",
-        model: "DS-215",
-        serialNumber: "SN-9841203",
-        accuracyClass: "Class III",
-        capacity: 30,
+        code: instrument?.instrumentCode ?? "",
+        category: type?.name ?? "",
+        manufacturer: instrument?.manufacturer ?? "",
+        model: instrument?.model ?? "",
+        serialNumber: instrument?.serialNumber ?? "",
+        accuracyClass: instrument?.accuracyClass ?? null,
+        capacity: instrument?.capacity ?? null,
+        capacityUnit: type?.unit ?? null,
       },
       integrity: {
         isHashVerified: true,

@@ -8,15 +8,15 @@ export const CandidateScoreSchema = z.object({
   candidateId: z.string(),
   candidateType: RouteTypeSchema,
   name: z.string(),
+  detail: z.string(),
   totalScore: z.number(),
   breakdown: z.object({
     distanceScore: z.number(),
     workloadScore: z.number(),
     availabilityScore: z.number(),
-    expertiseMatch: z.boolean(),
   }),
   currentWorkload: z.number().int(),
-  estimatedDistanceKm: z.number().nullable().optional(),
+  estimatedDistanceKm: z.number().nullable(),
 });
 export type CandidateScore = z.infer<typeof CandidateScoreSchema>;
 
@@ -41,33 +41,31 @@ export const AssignWorkOrderInputSchema = z.object({
 export type AssignWorkOrderInput = z.infer<typeof AssignWorkOrderInputSchema>;
 
 export const ScheduleAppointmentInputSchema = z.object({
-  workOrderId: z.string().min(1, "Work order ID is required"),
-  scheduledStart: z.string().datetime(),
-  scheduledEnd: z.string().datetime(),
-  locationNotes: z.string().optional(),
+  applicationId: z.string().min(1, "Application ID is required"),
+  scheduledStartAt: z.string().datetime(),
+  scheduledEndAt: z.string().datetime(),
+  location: z.string().optional(),
 });
 export type ScheduleAppointmentInput = z.infer<typeof ScheduleAppointmentInputSchema>;
 
 export const WorkOrderOutputSchema = z.object({
   id: z.string(),
-  orderNumber: z.string(),
   applicationId: z.string(),
   route: RouteTypeSchema,
-  lmoId: z.string().nullable().optional(),
-  gatcId: z.string().nullable().optional(),
-  scheduledStart: z.string().nullable().optional(),
-  scheduledEnd: z.string().nullable().optional(),
-  status: z.enum(["PENDING", "ASSIGNED", "SCHEDULED", "COMPLETED", "CANCELLED"]),
+  lmoId: z.string().nullable(),
+  gatcId: z.string().nullable(),
+  recommendedScore: z.string().nullable(),
+  wasOverridden: z.boolean(),
+  assignedById: z.string(),
   assignedAt: z.string(),
-  createdAt: z.string(),
+  scheduledStartAt: z.string().nullable(),
+  scheduledEndAt: z.string().nullable(),
+  location: z.string().nullable(),
 });
 export type WorkOrderOutput = z.infer<typeof WorkOrderOutputSchema>;
 
 export const ListWorkOrdersInputSchema = PaginationInputSchema.extend({
-  status: z.enum(["PENDING", "ASSIGNED", "SCHEDULED", "COMPLETED", "CANCELLED"]).optional(),
   route: RouteTypeSchema.optional(),
-  lmoId: z.string().optional(),
-  gatcId: z.string().optional(),
 });
 export type ListWorkOrdersInput = z.infer<typeof ListWorkOrdersInputSchema>;
 

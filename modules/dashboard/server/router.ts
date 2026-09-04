@@ -1,15 +1,13 @@
 import { implement } from "@orpc/server";
 import { dashboardContract } from "../contract";
 import { dashboardService } from "./service";
+import { requireAuth } from "@/middleware/require-auth";
+import type { AppContext } from "@/middleware/context";
 
-const implementer = implement(dashboardContract);
+const implementer = implement(dashboardContract).$context<AppContext>();
 
 export const dashboardRouter = implementer.router({
-  getStats: implementer.getStats.handler(async ({ input, context }: any) => {
-    return dashboardService.getStats(
-      input,
-      context?.user?.role ?? "INSTRUMENT_OWNER",
-      context?.user?.stateId ?? undefined
-    );
+  getStats: implementer.getStats.use(requireAuth).handler(async ({ context }) => {
+    return dashboardService.getStats(context.user!);
   }),
 });
