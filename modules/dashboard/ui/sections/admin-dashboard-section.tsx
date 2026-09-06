@@ -1,7 +1,10 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { Suspense } from "react";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const APPLICATION_STATUS_LABELS: Record<string, string> = {
   DRAFT: "Draft",
@@ -19,11 +22,36 @@ const APPLICATION_STATUS_LABELS: Record<string, string> = {
 };
 
 export function AdminDashboardSection() {
-  const statsQuery = useQuery(orpc.dashboard.getStats.queryOptions({}));
+  return (
+    <Suspense fallback={<AdminDashboardSkeleton />}>
+      <QueryErrorBoundary>
+        <AdminDashboardContent />
+      </QueryErrorBoundary>
+    </Suspense>
+  );
+}
 
-  if (statsQuery.isPending) return <p className="text-sm text-muted-foreground">Loading dashboard…</p>;
+export function AdminDashboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Skeleton className="h-20" />
+        <Skeleton className="h-20" />
+        <Skeleton className="h-20" />
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Skeleton className="h-48" />
+        <Skeleton className="h-48" />
+        <Skeleton className="h-48" />
+      </div>
+    </div>
+  );
+}
 
-  const admin = statsQuery.data?.admin;
+function AdminDashboardContent() {
+  const { data } = useSuspenseQuery(orpc.dashboard.getStats.queryOptions({}));
+
+  const admin = data.admin;
 
   const appEntries = admin ? Object.entries(admin.applicationsByStatus) : [];
   const certTotal = admin ? Object.values(admin.certificatesByStatus).reduce((a, b) => a + b, 0) : 0;

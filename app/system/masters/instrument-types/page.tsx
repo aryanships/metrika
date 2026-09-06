@@ -1,15 +1,18 @@
-import { InstrumentTypesSection } from "@/modules/masters/ui/sections/instrument-types-section";
+import { orpc } from "@/lib/orpc-query.server";
+import { getQueryClient } from "@/lib/query-client.server";
+import { HydrateClient } from "@/components/hydrate-client";
+import { InstrumentTypesView } from "@/modules/masters/ui/views/instrument-types-view";
 
-export default function InstrumentTypesPage() {
+export default async function InstrumentTypesPage() {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(
+    orpc.masters.listInstrumentTypes.queryOptions({ input: { page: 1, limit: 100 } }),
+  );
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Instrument types</h1>
-        <p className="text-sm text-muted-foreground">
-          Controlled master categories referenced by instruments, rules, and templates.
-        </p>
-      </header>
-      <InstrumentTypesSection />
-    </div>
+    <HydrateClient>
+      <InstrumentTypesView />
+    </HydrateClient>
   );
 }

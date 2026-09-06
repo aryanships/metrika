@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Suspense, useState } from "react";
+import { useMutation, useQuery, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
 import { Field, inputClass, toDatetimeLocal, fromDatetimeLocal } from "../field";
@@ -32,13 +34,35 @@ const EMPTY: FormState = {
 };
 
 export function RegulatoryRulesSection() {
+  return (
+    <Suspense fallback={<RegulatoryRulesSkeleton />}>
+      <QueryErrorBoundary>
+        <RegulatoryRulesContent />
+      </QueryErrorBoundary>
+    </Suspense>
+  );
+}
+
+export function RegulatoryRulesSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Skeleton key={i} className="h-12 w-full" />
+      ))}
+    </div>
+  );
+}
+
+function RegulatoryRulesContent() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<RegulatoryRuleOutput | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
   const [error, setError] = useState<string | null>(null);
 
-  const rulesQuery = useQuery(orpc.masters.listRegulatoryRules.queryOptions({ input: { page: 1, limit: 100 } }));
+  const { data } = useSuspenseQuery(
+    orpc.masters.listRegulatoryRules.queryOptions({ input: { page: 1, limit: 100 } }),
+  );
   const typesQuery = useQuery(orpc.masters.listInstrumentTypes.queryOptions({ input: { page: 1, limit: 100 } }));
 
   const create = useMutation(
@@ -107,8 +131,6 @@ export function RegulatoryRulesSection() {
     }
   }
 
-  if (rulesQuery.isPending) return <p className="text-sm text-muted-foreground">Loading rules…</p>;
-
   return (
     <div className="flex flex-col gap-4">
       {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
@@ -163,7 +185,7 @@ export function RegulatoryRulesSection() {
       )}
 
       <DataTable<RegulatoryRuleOutput>
-        rows={rulesQuery.data?.items ?? []}
+        rows={data.items}
         getRowKey={(r) => r.id}
         emptyTitle="No regulatory rules"
         columns={[

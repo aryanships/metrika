@@ -1,13 +1,16 @@
-import { FieldDashboardSection } from "@/modules/dashboard/ui/field-dashboard-section";
+import { orpc } from "@/lib/orpc-query.server";
+import { getQueryClient } from "@/lib/query-client.server";
+import { HydrateClient } from "@/components/hydrate-client";
+import { FieldDashboardView } from "@/modules/dashboard/ui/views/field-dashboard-view";
 
-export default function FieldDashboardPage() {
+export default async function FieldDashboardPage() {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(orpc.dashboard.getStats.queryOptions({}));
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Field dashboard</h1>
-        <p className="text-sm text-muted-foreground">Your assigned verification work.</p>
-      </header>
-      <FieldDashboardSection />
-    </div>
+    <HydrateClient>
+      <FieldDashboardView />
+    </HydrateClient>
   );
 }

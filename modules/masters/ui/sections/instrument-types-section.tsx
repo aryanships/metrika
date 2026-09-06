@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Suspense, useState } from "react";
+import { useMutation, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
 import { Field, inputClass } from "../field";
@@ -18,13 +20,35 @@ interface FormState {
 const EMPTY: FormState = { code: "", name: "", unit: "" };
 
 export function InstrumentTypesSection() {
+  return (
+    <Suspense fallback={<InstrumentTypesSkeleton />}>
+      <QueryErrorBoundary>
+        <InstrumentTypesContent />
+      </QueryErrorBoundary>
+    </Suspense>
+  );
+}
+
+export function InstrumentTypesSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Skeleton key={i} className="h-12 w-full" />
+      ))}
+    </div>
+  );
+}
+
+function InstrumentTypesContent() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<InstrumentTypeOutput | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
   const [error, setError] = useState<string | null>(null);
 
-  const typesQuery = useQuery(orpc.masters.listInstrumentTypes.queryOptions({ input: { page: 1, limit: 100 } }));
+  const { data } = useSuspenseQuery(
+    orpc.masters.listInstrumentTypes.queryOptions({ input: { page: 1, limit: 100 } }),
+  );
 
   const create = useMutation(
     orpc.masters.createInstrumentType.mutationOptions({
@@ -71,8 +95,6 @@ export function InstrumentTypesSection() {
     }
   }
 
-  if (typesQuery.isPending) return <p className="text-sm text-muted-foreground">Loading instrument types…</p>;
-
   return (
     <div className="flex flex-col gap-4">
       {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
@@ -105,7 +127,7 @@ export function InstrumentTypesSection() {
       )}
 
       <DataTable<InstrumentTypeOutput>
-        rows={typesQuery.data?.items ?? []}
+        rows={data.items}
         getRowKey={(t) => t.id}
         emptyTitle="No instrument types"
         columns={[

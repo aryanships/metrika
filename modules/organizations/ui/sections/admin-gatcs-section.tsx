@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Suspense, useState } from "react";
+import { useMutation, useQuery, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
 import { formatDate } from "@/lib/format";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
 import type { GatcOutput, GatcStaffRole } from "../../schema";
@@ -63,6 +65,26 @@ const EMPTY_GATC = {
 const EMPTY_STAFF = { gatcId: "", email: "", fullName: "", phone: "", role: "OPERATOR" as GatcStaffRole };
 
 export function AdminGatcsSection() {
+  return (
+    <Suspense fallback={<AdminGatcsSkeleton />}>
+      <QueryErrorBoundary>
+        <AdminGatcsContent />
+      </QueryErrorBoundary>
+    </Suspense>
+  );
+}
+
+export function AdminGatcsSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Skeleton key={i} className="h-14 w-full" />
+      ))}
+    </div>
+  );
+}
+
+function AdminGatcsContent() {
   const queryClient = useQueryClient();
   const [showProvision, setShowProvision] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
@@ -73,7 +95,7 @@ export function AdminGatcsSection() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const gatcsQuery = useQuery(
+  const { data } = useSuspenseQuery(
     orpc.organizations.listGatcs.queryOptions({ input: { page: 1, limit: 200, activeOnly: false } }),
   );
   const districtsQuery = useQuery(
@@ -140,9 +162,6 @@ export function AdminGatcsSection() {
       setError(describeError(err));
     }
   }
-
-  if (gatcsQuery.isPending) return <p className="text-sm text-muted-foreground">Loading GATCs…</p>;
-  if (gatcsQuery.error) return <p className="text-sm text-destructive">Failed to load GATCs.</p>;
 
   return (
     <div className="flex flex-col gap-4">
@@ -213,7 +232,7 @@ export function AdminGatcsSection() {
             <Field label="GATC">
               <select className={inputClass} value={staff.gatcId} onChange={(e) => setStaff({ ...staff, gatcId: e.target.value })} required>
                 <option value="">Select GATC…</option>
-                {(gatcsQuery.data?.items ?? []).map((g) => (
+                {data.items.map((g) => (
                   <option key={g.id} value={g.id}>{g.legalName}</option>
                 ))}
               </select>
@@ -243,7 +262,7 @@ export function AdminGatcsSection() {
       )}
 
       <DataTable<GatcOutput>
-        rows={gatcsQuery.data?.items ?? []}
+        rows={data.items}
         getRowKey={(r) => r.id}
         emptyTitle="No GATCs provisioned"
         columns={[

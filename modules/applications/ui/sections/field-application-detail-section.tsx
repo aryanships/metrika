@@ -1,10 +1,13 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
 import { formatDateTime } from "@/lib/format";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { AttachmentList } from "@/components/attachment-list";
 import { ApplicationStatusBadge } from "../components/application-status-badge";
@@ -25,8 +28,31 @@ function humanize(value: string): string {
 }
 
 export function FieldApplicationDetailSection({ id }: { id: string }) {
+  return (
+    <Suspense key={id} fallback={<FieldApplicationDetailSkeleton />}>
+      <QueryErrorBoundary>
+        <FieldApplicationDetailContent id={id} />
+      </QueryErrorBoundary>
+    </Suspense>
+  );
+}
+
+export function FieldApplicationDetailSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-72" />
+      </div>
+      <Skeleton className="h-40 w-full" />
+      <Skeleton className="h-32 w-full" />
+    </div>
+  );
+}
+
+function FieldApplicationDetailContent({ id }: { id: string }) {
   const queryClient = useQueryClient();
-  const query = useQuery(orpc.applications.detail.queryOptions({ input: { id } }));
+  const { data } = useSuspenseQuery(orpc.applications.detail.queryOptions({ input: { id } }));
 
   const issue = useMutation(
     orpc.certificates.issue.mutationOptions({
@@ -37,11 +63,7 @@ export function FieldApplicationDetailSection({ id }: { id: string }) {
     }),
   );
 
-  if (query.isPending) return <p className="text-sm text-muted-foreground">Loading application…</p>;
-  if (query.error) return <p className="text-sm text-destructive">Failed to load application.</p>;
-  if (!query.data) return null;
-
-  const { application, instrument, appointment, priorCertificates, contactPhone, contactEmail, businessName, statusHistory } = query.data;
+  const { application, instrument, appointment, priorCertificates, contactPhone, contactEmail, businessName, statusHistory } = data;
   const status = application.status;
 
   const startable = status === "SCHEDULED";

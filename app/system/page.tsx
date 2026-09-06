@@ -1,15 +1,16 @@
-import { SystemDashboardSection } from "@/modules/dashboard/ui/system-dashboard-section";
+import { orpc } from "@/lib/orpc-query.server";
+import { getQueryClient } from "@/lib/query-client.server";
+import { HydrateClient } from "@/components/hydrate-client";
+import { SystemDashboardView } from "@/modules/dashboard/ui/views/system-dashboard-view";
 
-export default function SystemDashboardPage() {
+export default async function SystemDashboardPage() {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(orpc.dashboard.getStats.queryOptions({}));
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">System Administration</h1>
-        <p className="text-sm text-muted-foreground">
-          Platform-wide master data, account provisioning, and audit.
-        </p>
-      </header>
-      <SystemDashboardSection />
-    </div>
+    <HydrateClient>
+      <SystemDashboardView />
+    </HydrateClient>
   );
 }

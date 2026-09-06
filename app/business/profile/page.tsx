@@ -1,13 +1,16 @@
-import { BusinessProfileSection } from "@/modules/businesses/ui/sections/business-profile-section";
+import { orpc } from "@/lib/orpc-query.server";
+import { getQueryClient } from "@/lib/query-client.server";
+import { HydrateClient } from "@/components/hydrate-client";
+import { BusinessProfileView } from "@/modules/businesses/ui/views/business-profile-view";
 
-export default function ProfilePage() {
+export default async function ProfilePage() {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(orpc.businesses.get.queryOptions());
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Business profile</h1>
-        <p className="text-sm text-muted-foreground">Your business identity, used across registrations and certificates.</p>
-      </header>
-      <BusinessProfileSection />
-    </div>
+    <HydrateClient>
+      <BusinessProfileView />
+    </HydrateClient>
   );
 }

@@ -1,13 +1,19 @@
-import { OwnerDashboardSection } from "@/modules/dashboard/ui/owner-dashboard-section";
+import { orpc } from "@/lib/orpc-query.server";
+import { getQueryClient } from "@/lib/query-client.server";
+import { HydrateClient } from "@/components/hydrate-client";
+import { OwnerDashboardView } from "@/modules/dashboard/ui/views/owner-dashboard-view";
 
-export default function OwnerDashboardPage() {
+export default async function OwnerDashboardPage() {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(orpc.dashboard.getStats.queryOptions({}));
+  void queryClient.prefetchQuery(
+    orpc.notifications.listMine.queryOptions({ input: { page: 1, limit: 5 } }),
+  );
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Your instruments, certificates, and verification lifecycle.</p>
-      </header>
-      <OwnerDashboardSection />
-    </div>
+    <HydrateClient>
+      <OwnerDashboardView />
+    </HydrateClient>
   );
 }

@@ -1,13 +1,18 @@
-import { NotificationsListSection } from "@/modules/notifications/ui/sections/notifications-list-section";
+import { orpc } from "@/lib/orpc-query.server";
+import { getQueryClient } from "@/lib/query-client.server";
+import { HydrateClient } from "@/components/hydrate-client";
+import { NotificationsView } from "@/modules/notifications/ui/views/notifications-view";
 
-export default function NotificationsPage() {
+export default async function NotificationsPage() {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(
+    orpc.notifications.listMine.queryOptions({ input: { page: 1, limit: 100 } }),
+  );
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Notifications</h1>
-        <p className="text-sm text-muted-foreground">Updates about your instruments, applications, and certificates.</p>
-      </header>
-      <NotificationsListSection />
-    </div>
+    <HydrateClient>
+      <NotificationsView />
+    </HydrateClient>
   );
 }

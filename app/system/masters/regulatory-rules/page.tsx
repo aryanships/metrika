@@ -1,15 +1,21 @@
-import { RegulatoryRulesSection } from "@/modules/masters/ui/sections/regulatory-rules-section";
+import { orpc } from "@/lib/orpc-query.server";
+import { getQueryClient } from "@/lib/query-client.server";
+import { HydrateClient } from "@/components/hydrate-client";
+import { RegulatoryRulesView } from "@/modules/masters/ui/views/regulatory-rules-view";
 
-export default function RegulatoryRulesPage() {
+export default async function RegulatoryRulesPage() {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(
+    orpc.masters.listRegulatoryRules.queryOptions({ input: { page: 1, limit: 100 } }),
+  );
+  void queryClient.prefetchQuery(
+    orpc.masters.listInstrumentTypes.queryOptions({ input: { page: 1, limit: 100 } }),
+  );
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Regulatory rules</h1>
-        <p className="text-sm text-muted-foreground">
-          Versioned tolerance windows; overlapping capacity/class bands are rejected.
-        </p>
-      </header>
-      <RegulatoryRulesSection />
-    </div>
+    <HydrateClient>
+      <RegulatoryRulesView />
+    </HydrateClient>
   );
 }

@@ -1,13 +1,24 @@
-import { AdminGatcsSection } from "@/modules/organizations/ui/sections/admin-gatcs-section";
+import { orpc } from "@/lib/orpc-query.server";
+import { getQueryClient } from "@/lib/query-client.server";
+import { HydrateClient } from "@/components/hydrate-client";
+import { AdminGatcsView } from "@/modules/organizations/ui/views/admin-gatcs-view";
 
-export default function AdminGatcsPage() {
+export default async function AdminGatcsPage() {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(
+    orpc.organizations.listGatcs.queryOptions({ input: { page: 1, limit: 200, activeOnly: false } }),
+  );
+  void queryClient.prefetchQuery(
+    orpc.masters.listAdministrativeUnits.queryOptions({ input: { type: "DISTRICT", page: 1, limit: 200 } }),
+  );
+  void queryClient.prefetchQuery(
+    orpc.masters.listInstrumentTypes.queryOptions({ input: { page: 1, limit: 100 } }),
+  );
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Government Approved Testing Centres</h1>
-        <p className="text-sm text-muted-foreground">Provision testing centres, their authorizations, and staff.</p>
-      </header>
-      <AdminGatcsSection />
-    </div>
+    <HydrateClient>
+      <AdminGatcsView />
+    </HydrateClient>
   );
 }

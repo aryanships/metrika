@@ -1,15 +1,36 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { Suspense } from "react";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/stat-card";
 
 export function SystemDashboardSection() {
-  const statsQuery = useQuery(orpc.dashboard.getStats.queryOptions({}));
+  return (
+    <Suspense fallback={<SystemDashboardSkeleton />}>
+      <QueryErrorBoundary>
+        <SystemDashboardContent />
+      </QueryErrorBoundary>
+    </Suspense>
+  );
+}
 
-  if (statsQuery.isPending) return <p className="text-sm text-muted-foreground">Loading dashboard…</p>;
+export function SystemDashboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-8">
+      <Skeleton className="h-24" />
+      <Skeleton className="h-24" />
+      <Skeleton className="h-24" />
+    </div>
+  );
+}
 
-  const s = statsQuery.data?.system;
+function SystemDashboardContent() {
+  const { data } = useSuspenseQuery(orpc.dashboard.getStats.queryOptions({}));
+
+  const s = data.system;
   if (!s) return <p className="text-sm text-muted-foreground">No platform statistics available.</p>;
 
   return (

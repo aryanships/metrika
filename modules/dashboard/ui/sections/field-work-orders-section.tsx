@@ -1,8 +1,11 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ApplicationStatusBadge } from "@/modules/applications/ui/components/application-status-badge";
 import type { ApplicationStatus } from "@/modules/applications/schema";
 
@@ -44,11 +47,32 @@ function WorkOrderList({ orders }: { orders: { applicationId: string; applicatio
 }
 
 export function FieldWorkOrdersSection() {
-  const statsQuery = useQuery(orpc.dashboard.getStats.queryOptions({}));
+  return (
+    <Suspense fallback={<FieldWorkOrdersSkeleton />}>
+      <QueryErrorBoundary>
+        <FieldWorkOrdersContent />
+      </QueryErrorBoundary>
+    </Suspense>
+  );
+}
 
-  if (statsQuery.isPending) return <p className="text-sm text-muted-foreground">Loading work orders…</p>;
+export function FieldWorkOrdersSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="flex flex-col gap-2">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-16 w-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
-  const workOrders = statsQuery.data?.field?.workOrders ?? [];
+function FieldWorkOrdersContent() {
+  const { data } = useSuspenseQuery(orpc.dashboard.getStats.queryOptions({}));
+
+  const workOrders = data.field?.workOrders ?? [];
   const scheduled = workOrders.filter((w) => w.status === "SCHEDULED");
   const inProgress = workOrders.filter((w) => w.status === "VERIFICATION_IN_PROGRESS");
   const completed = workOrders.filter((w) => ["PASSED", "FAILED", "CERTIFICATE_GENERATED"].includes(w.status));

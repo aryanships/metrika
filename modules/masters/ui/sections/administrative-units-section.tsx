@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Suspense, useState } from "react";
+import { useMutation, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
 import { Field, inputClass } from "../field";
@@ -28,13 +30,33 @@ interface FormState {
 const EMPTY: FormState = { name: "", type: "DISTRICT", parentId: "", latitude: "", longitude: "" };
 
 export function AdministrativeUnitsSection() {
+  return (
+    <Suspense fallback={<AdministrativeUnitsSkeleton />}>
+      <QueryErrorBoundary>
+        <AdministrativeUnitsContent />
+      </QueryErrorBoundary>
+    </Suspense>
+  );
+}
+
+export function AdministrativeUnitsSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Skeleton key={i} className="h-12 w-full" />
+      ))}
+    </div>
+  );
+}
+
+function AdministrativeUnitsContent() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<AdministrativeUnitOutput | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
   const [error, setError] = useState<string | null>(null);
 
-  const unitsQuery = useQuery(
+  const { data } = useSuspenseQuery(
     orpc.masters.listAdministrativeUnits.queryOptions({ input: { page: 1, limit: 100 } }),
   );
 
@@ -54,7 +76,7 @@ export function AdministrativeUnitsSection() {
     }),
   );
 
-  const units = unitsQuery.data?.items ?? [];
+  const units = data.items;
   const byId = new Map(units.map((u) => [u.id, u]));
   const parentOptions = units.filter((u) => u.type === PARENT_TYPE[form.type]);
 
@@ -103,8 +125,6 @@ export function AdministrativeUnitsSection() {
       setError(describeError(err));
     }
   }
-
-  if (unitsQuery.isPending) return <p className="text-sm text-muted-foreground">Loading units…</p>;
 
   return (
     <div className="flex flex-col gap-4">

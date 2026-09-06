@@ -1,13 +1,18 @@
-import { FieldCertificatesSection } from "@/modules/certificates/ui/sections/field-certificates-section";
+import { orpc } from "@/lib/orpc-query.server";
+import { getQueryClient } from "@/lib/query-client.server";
+import { HydrateClient } from "@/components/hydrate-client";
+import { FieldCertificatesView } from "@/modules/certificates/ui/views/field-certificates-view";
 
-export default function FieldCertificatesPage() {
+export default async function FieldCertificatesPage() {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(
+    orpc.certificates.listField.queryOptions({ input: { page: 1, limit: 100 } }),
+  );
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Certificates</h1>
-        <p className="text-sm text-muted-foreground">Certificates issued for your verification work.</p>
-      </header>
-      <FieldCertificatesSection />
-    </div>
+    <HydrateClient>
+      <FieldCertificatesView />
+    </HydrateClient>
   );
 }

@@ -1,15 +1,18 @@
-import { AuditLogSection } from "@/modules/audit/ui/audit-log-section";
+import { orpc } from "@/lib/orpc-query.server";
+import { getQueryClient } from "@/lib/query-client.server";
+import { HydrateClient } from "@/components/hydrate-client";
+import { AuditLogView } from "@/modules/audit/ui/views/audit-log-view";
 
-export default function SystemAuditPage() {
+export default async function SystemAuditPage() {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(
+    orpc.audit.listEvents.queryOptions({ input: { page: 1, limit: 50 } }),
+  );
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Audit log</h1>
-        <p className="text-sm text-muted-foreground">
-          Immutable, append-only record of who did what, when, and where.
-        </p>
-      </header>
-      <AuditLogSection />
-    </div>
+    <HydrateClient>
+      <AuditLogView description="Immutable, append-only record of who did what, when, and where." />
+    </HydrateClient>
   );
 }

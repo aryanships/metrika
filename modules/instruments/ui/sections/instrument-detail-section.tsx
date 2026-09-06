@@ -1,9 +1,12 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { formatDate } from "@/lib/format";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { InstrumentStatusBadge } from "../components/instrument-status-badge";
 import { CertificateStatusBadge } from "@/modules/certificates/ui/components/certificate-status-badge";
 import { ApplicationStatusBadge } from "@/modules/applications/ui/components/application-status-badge";
@@ -22,11 +25,29 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export function InstrumentDetailSection({ id }: { id: string }) {
-  const { data, isPending, error } = useQuery(orpc.instruments.passport.queryOptions({ input: { id } }));
+  return (
+    <Suspense key={id} fallback={<InstrumentDetailSkeleton />}>
+      <QueryErrorBoundary>
+        <InstrumentDetailContent id={id} />
+      </QueryErrorBoundary>
+    </Suspense>
+  );
+}
 
-  if (isPending) return <p className="text-sm text-muted-foreground">Loading instrument…</p>;
-  if (error) return <p className="text-sm text-destructive">Failed to load instrument.</p>;
-  if (!data) return null;
+export function InstrumentDetailSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-72" />
+      </div>
+      <Skeleton className="h-56 w-full" />
+    </div>
+  );
+}
+
+function InstrumentDetailContent({ id }: { id: string }) {
+  const { data } = useSuspenseQuery(orpc.instruments.passport.queryOptions({ input: { id } }));
 
   const { instrument, certificates, applications } = data;
 

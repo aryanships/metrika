@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { ApplicationStatusBadge } from "@/modules/applications/ui/components/application-status-badge";
 import type { ApplicationStatus } from "@/modules/applications/schema";
@@ -24,7 +26,31 @@ const inputClass =
   "flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30";
 
 export function FieldDashboardSection() {
-  const statsQuery = useQuery(orpc.dashboard.getStats.queryOptions({}));
+  return (
+    <Suspense fallback={<FieldDashboardSkeleton />}>
+      <QueryErrorBoundary>
+        <FieldDashboardContent />
+      </QueryErrorBoundary>
+    </Suspense>
+  );
+}
+
+export function FieldDashboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <Skeleton className="h-24 w-full" />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Skeleton className="h-20" />
+        <Skeleton className="h-20" />
+        <Skeleton className="h-20" />
+      </div>
+      <Skeleton className="h-48 w-full" />
+    </div>
+  );
+}
+
+function FieldDashboardContent() {
+  const { data } = useSuspenseQuery(orpc.dashboard.getStats.queryOptions({}));
   const [code, setCode] = useState("");
   const [identified, setIdentified] = useState<IdentifyInstrumentOutput | null>(null);
   const [identifyError, setIdentifyError] = useState<string | null>(null);
@@ -39,9 +65,7 @@ export function FieldDashboardSection() {
     }),
   );
 
-  if (statsQuery.isPending) return <p className="text-sm text-muted-foreground">Loading dashboard…</p>;
-
-  const field = statsQuery.data?.field;
+  const field = data.field;
 
   function onSubmitIdentify(e: React.FormEvent) {
     e.preventDefault();

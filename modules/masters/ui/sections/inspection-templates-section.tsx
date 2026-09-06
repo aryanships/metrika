@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Suspense, useState } from "react";
+import { useMutation, useQuery, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
 import { Field, inputClass, toDatetimeLocal, fromDatetimeLocal } from "../field";
@@ -40,6 +42,26 @@ const EMPTY: FormState = {
 const EMPTY_ITEM: ItemInput = { code: "", label: "", kind: "CHECKLIST", unit: "", isRequired: true };
 
 export function InspectionTemplatesSection() {
+  return (
+    <Suspense fallback={<InspectionTemplatesSkeleton />}>
+      <QueryErrorBoundary>
+        <InspectionTemplatesContent />
+      </QueryErrorBoundary>
+    </Suspense>
+  );
+}
+
+export function InspectionTemplatesSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Skeleton key={i} className="h-12 w-full" />
+      ))}
+    </div>
+  );
+}
+
+function InspectionTemplatesContent() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<InspectionTemplateOutput | null>(null);
@@ -47,7 +69,9 @@ export function InspectionTemplatesSection() {
   const [items, setItems] = useState<ItemInput[]>([EMPTY_ITEM]);
   const [error, setError] = useState<string | null>(null);
 
-  const templatesQuery = useQuery(orpc.masters.listInspectionTemplates.queryOptions({ input: { page: 1, limit: 100 } }));
+  const { data } = useSuspenseQuery(
+    orpc.masters.listInspectionTemplates.queryOptions({ input: { page: 1, limit: 100 } }),
+  );
   const typesQuery = useQuery(orpc.masters.listInstrumentTypes.queryOptions({ input: { page: 1, limit: 100 } }));
 
   const create = useMutation(
@@ -126,8 +150,6 @@ export function InspectionTemplatesSection() {
       setError(describeError(err));
     }
   }
-
-  if (templatesQuery.isPending) return <p className="text-sm text-muted-foreground">Loading templates…</p>;
 
   return (
     <div className="flex flex-col gap-4">
@@ -212,7 +234,7 @@ export function InspectionTemplatesSection() {
       )}
 
       <DataTable<InspectionTemplateOutput>
-        rows={templatesQuery.data?.items ?? []}
+        rows={data.items}
         getRowKey={(t) => t.id}
         emptyTitle="No inspection templates"
         columns={[

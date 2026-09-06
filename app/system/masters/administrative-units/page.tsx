@@ -1,15 +1,18 @@
-import { AdministrativeUnitsSection } from "@/modules/masters/ui/sections/administrative-units-section";
+import { orpc } from "@/lib/orpc-query.server";
+import { getQueryClient } from "@/lib/query-client.server";
+import { HydrateClient } from "@/components/hydrate-client";
+import { AdministrativeUnitsView } from "@/modules/masters/ui/views/administrative-units-view";
 
-export default function AdministrativeUnitsPage() {
+export default async function AdministrativeUnitsPage() {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(
+    orpc.masters.listAdministrativeUnits.queryOptions({ input: { page: 1, limit: 100 } }),
+  );
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Administrative units</h1>
-        <p className="text-sm text-muted-foreground">
-          State → District → Tehsil → Village hierarchy used for locations, jurisdictions, and scopes.
-        </p>
-      </header>
-      <AdministrativeUnitsSection />
-    </div>
+    <HydrateClient>
+      <AdministrativeUnitsView />
+    </HydrateClient>
   );
 }

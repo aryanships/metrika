@@ -1,8 +1,11 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { InstrumentStatusBadge } from "@/modules/instruments/ui/components/instrument-status-badge";
 import { CertificateStatusBadge } from "@/modules/certificates/ui/components/certificate-status-badge";
 import type { InstrumentStatus } from "@/modules/instruments/schema";
@@ -23,19 +26,41 @@ function StatCard({ label, value, href }: { label: string; value: number; href?:
 }
 
 export function OwnerDashboardSection() {
+  return (
+    <Suspense fallback={<OwnerDashboardSkeleton />}>
+      <QueryErrorBoundary>
+        <OwnerDashboardContent />
+      </QueryErrorBoundary>
+    </Suspense>
+  );
+}
+
+export function OwnerDashboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Skeleton className="h-20" />
+        <Skeleton className="h-20" />
+        <Skeleton className="h-20" />
+        <Skeleton className="h-20" />
+      </div>
+      <Skeleton className="h-48 w-full" />
+    </div>
+  );
+}
+
+function OwnerDashboardContent() {
   const queryClient = useQueryClient();
-  const statsQuery = useQuery(orpc.dashboard.getStats.queryOptions({}));
+  const { data } = useSuspenseQuery(orpc.dashboard.getStats.queryOptions({}));
   const notifQuery = useQuery(orpc.notifications.listMine.queryOptions({ input: { page: 1, limit: 5 } }));
 
   const markRead = useMutation(
     orpc.notifications.markRead.mutationOptions({
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.notifications.key() }),
     }),
   );
 
-  if (statsQuery.isPending) return <p className="text-sm text-muted-foreground">Loading dashboard…</p>;
-
-  const owner = statsQuery.data?.owner;
+  const owner = data.owner;
   const expired = owner?.certificatesByStatus["EXPIRED"] ?? 0;
   const expiring = owner?.certificatesByStatus["EXPIRING_SOON"] ?? 0;
   const needsReverification = expired + expiring > 0;

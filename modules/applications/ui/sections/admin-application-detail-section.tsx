@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Suspense, useState } from "react";
+import { useMutation, useQuery, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
 import { formatDateTime } from "@/lib/format";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { AttachmentList } from "@/components/attachment-list";
 import { ApplicationStatusBadge } from "../components/application-status-badge";
@@ -32,6 +34,30 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export function AdminApplicationDetailSection({ id }: { id: string }) {
+  return (
+    <Suspense key={id} fallback={<AdminApplicationDetailSkeleton />}>
+      <QueryErrorBoundary>
+        <AdminApplicationDetailContent id={id} />
+      </QueryErrorBoundary>
+    </Suspense>
+  );
+}
+
+export function AdminApplicationDetailSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-80" />
+      </div>
+      <Skeleton className="h-48 w-full" />
+      <Skeleton className="h-32 w-full" />
+      <Skeleton className="h-24 w-full" />
+    </div>
+  );
+}
+
+function AdminApplicationDetailContent({ id }: { id: string }) {
   const queryClient = useQueryClient();
   const [correctionReason, setCorrectionReason] = useState("");
   const [rejectReason, setRejectReason] = useState("");
@@ -41,14 +67,14 @@ export function AdminApplicationDetailSection({ id }: { id: string }) {
   const [location, setLocation] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const detailQuery = useQuery(orpc.applications.detail.queryOptions({ input: { id } }));
+  const { data } = useSuspenseQuery(orpc.applications.detail.queryOptions({ input: { id } }));
   const workOrdersQuery = useQuery(
     orpc.scheduling.listWorkOrders.queryOptions({ input: { applicationId: id } }),
   );
   const recommendQuery = useQuery(
     orpc.scheduling.recommend.queryOptions({
       input: { applicationId: id },
-      enabled: detailQuery.data?.application.status === "APPROVED",
+      enabled: data.application.status === "APPROVED",
     }),
   );
 
@@ -74,11 +100,7 @@ export function AdminApplicationDetailSection({ id }: { id: string }) {
     }
   }
 
-  if (detailQuery.isPending) return <p className="text-sm text-muted-foreground">Loading application…</p>;
-  if (detailQuery.error) return <p className="text-sm text-destructive">Failed to load application.</p>;
-  if (!detailQuery.data) return null;
-
-  const { application, instrument, businessName, statusHistory, completeness } = detailQuery.data;
+  const { application, instrument, businessName, statusHistory, completeness } = data;
   const status = application.status;
   const workOrder = workOrdersQuery.data?.items[0];
   const candidates = recommendQuery.data?.candidates ?? [];

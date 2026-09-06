@@ -1,13 +1,16 @@
-import { AdminDashboardSection } from "@/modules/dashboard/ui/admin-dashboard-section";
+import { orpc } from "@/lib/orpc-query.server";
+import { getQueryClient } from "@/lib/query-client.server";
+import { HydrateClient } from "@/components/hydrate-client";
+import { AdminDashboardView } from "@/modules/dashboard/ui/views/admin-dashboard-view";
 
-export default function AdminDashboardPage() {
+export default async function AdminDashboardPage() {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(orpc.dashboard.getStats.queryOptions({}));
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Administration</h1>
-        <p className="text-sm text-muted-foreground">Operational overview of applications, certificates, and workload.</p>
-      </header>
-      <AdminDashboardSection />
-    </div>
+    <HydrateClient>
+      <AdminDashboardView />
+    </HydrateClient>
   );
 }

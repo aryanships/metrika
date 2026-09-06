@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Suspense, useState } from "react";
+import { useMutation, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,10 +13,26 @@ import { Label } from "@/components/ui/label";
 import type { BusinessOutput } from "../../schema";
 
 export function BusinessProfileSection() {
-  const { data, isPending, error } = useQuery(orpc.businesses.get.queryOptions());
+  return (
+    <Suspense fallback={<BusinessProfileSkeleton />}>
+      <QueryErrorBoundary>
+        <BusinessProfileContent />
+      </QueryErrorBoundary>
+    </Suspense>
+  );
+}
 
-  if (isPending) return <p className="text-sm text-muted-foreground">Loading profile…</p>;
-  if (error) return <p className="text-sm text-destructive">Failed to load profile.</p>;
+export function BusinessProfileSkeleton() {
+  return (
+    <div className="flex flex-col gap-4">
+      <Skeleton className="h-4 w-32" />
+      <Skeleton className="h-40 max-w-2xl" />
+    </div>
+  );
+}
+
+function BusinessProfileContent() {
+  const { data } = useSuspenseQuery(orpc.businesses.get.queryOptions());
 
   return <BusinessForm initial={data ?? null} />;
 }

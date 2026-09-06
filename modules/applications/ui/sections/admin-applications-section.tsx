@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { formatDate } from "@/lib/format";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { DataTable } from "@/components/data-table";
 import { Pagination } from "@/components/pagination";
 import { ApplicationStatusBadge } from "../components/application-status-badge";
@@ -62,25 +64,7 @@ export function AdminApplicationsSection() {
     orpc.masters.listAdministrativeUnits.queryOptions({ input: { type: "DISTRICT", page: 1, limit: 200 } }),
   );
 
-  const query = useQuery(
-    orpc.applications.listQueue.queryOptions({
-      input: {
-        page,
-        limit: 20,
-        status: (status || undefined) as ApplicationStatus | undefined,
-        type: (type || undefined) as ApplicationType | undefined,
-        priority: (priority || undefined) as Priority | undefined,
-        districtId: districtId || undefined,
-        sortOrder,
-      },
-    }),
-  );
-
-  if (query.isPending) return <p className="text-sm text-muted-foreground">Loading review queue…</p>;
-  if (query.error) return <p className="text-sm text-destructive">Failed to load review queue.</p>;
-
-  const applications = query.data?.items ?? [];
-  const pagination = query.data?.pagination;
+  const filterKey = `${status}-${type}-${priority}-${districtId}-${sortOrder}-${page}`;
 
   return (
     <div className="flex flex-col gap-4">
@@ -115,6 +99,69 @@ export function AdminApplicationsSection() {
         </select>
       </div>
 
+      <Suspense key={filterKey} fallback={<AdminApplicationsSkeleton />}>
+        <QueryErrorBoundary>
+          <AdminApplicationsContent
+            page={page}
+            status={(status || undefined) as ApplicationStatus | undefined}
+            type={(type || undefined) as ApplicationType | undefined}
+            priority={(priority || undefined) as Priority | undefined}
+            districtId={districtId || undefined}
+            sortOrder={sortOrder}
+            onPage={setPage}
+          />
+        </QueryErrorBoundary>
+      </Suspense>
+    </div>
+  );
+}
+
+export function AdminApplicationsSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Skeleton key={i} className="h-12 w-full" />
+      ))}
+    </div>
+  );
+}
+
+function AdminApplicationsContent({
+  page,
+  status,
+  type,
+  priority,
+  districtId,
+  sortOrder,
+  onPage,
+}: {
+  page: number;
+  status?: ApplicationStatus;
+  type?: ApplicationType;
+  priority?: Priority;
+  districtId?: string;
+  sortOrder: "asc" | "desc";
+  onPage: (page: number) => void;
+}) {
+  const { data } = useSuspenseQuery(
+    orpc.applications.listQueue.queryOptions({
+      input: {
+        page,
+        limit: 20,
+        status: (status || undefined) as ApplicationStatus | undefined,
+        type: (type || undefined) as ApplicationType | undefined,
+        priority: (priority || undefined) as Priority | undefined,
+        districtId: districtId || undefined,
+        sortOrder,
+      },
+    }),
+  );
+
+  const applications = data.items;
+  const pagination = data.pagination;
+
+  return (
+    <div className="flex flex-col gap-4">
       <DataTable<ApplicationOutput>
         rows={applications}
         getRowKey={(r) => r.id}
@@ -143,14 +190,12 @@ export function AdminApplicationsSection() {
         ]}
       />
 
-      {pagination && (
-        <Pagination
-          page={pagination.page}
-          totalPages={pagination.totalPages}
-          hasMore={pagination.hasMore}
-          onPage={setPage}
-        />
-      )}
+      <Pagination
+        page={pagination.page}
+        totalPages={pagination.totalPages}
+        hasMore={pagination.hasMore}
+        onPage={onPage}
+      />
     </div>
   );
 }

@@ -1,4 +1,8 @@
-import { QueryClient } from "@tanstack/react-query";
+import {
+  QueryClient,
+  defaultShouldDehydrateQuery,
+  type Query,
+} from "@tanstack/react-query";
 
 export function makeQueryClient() {
   return new QueryClient({
@@ -10,3 +14,12 @@ export function makeQueryClient() {
     },
   });
 }
+
+/**
+ * Dehydrate config used in pages: keep pending queries so a prefetch that is
+ * still in flight on the server is not dropped before hydration.
+ */
+export const dehydrateOptions = {
+  shouldDehydrateQuery: (query: Query) =>
+    defaultShouldDehydrateQuery(query) || query.state.status === "pending",
+};

@@ -1,8 +1,11 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { CertificateStatusBadge } from "../components/certificate-status-badge";
 import { CertificateQr } from "../components/certificate-qr";
 
@@ -20,11 +23,26 @@ function Field({ label, value, mono }: { label: string; value: React.ReactNode; 
 }
 
 export function CertificateDetailSection({ id }: { id: string }) {
-  const { data, isPending, error } = useQuery(orpc.certificates.get.queryOptions({ input: { id } }));
+  return (
+    <Suspense key={id} fallback={<CertificateDetailSkeleton />}>
+      <QueryErrorBoundary>
+        <CertificateDetailContent id={id} />
+      </QueryErrorBoundary>
+    </Suspense>
+  );
+}
 
-  if (isPending) return <p className="text-sm text-muted-foreground">Loading certificate…</p>;
-  if (error) return <p className="text-sm text-destructive">Failed to load certificate.</p>;
-  if (!data) return null;
+export function CertificateDetailSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <Skeleton className="h-8 w-56" />
+      <Skeleton className="h-64 w-full" />
+    </div>
+  );
+}
+
+function CertificateDetailContent({ id }: { id: string }) {
+  const { data } = useSuspenseQuery(orpc.certificates.get.queryOptions({ input: { id } }));
 
   const { instrument } = data;
 

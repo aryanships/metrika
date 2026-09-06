@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Suspense, useState } from "react";
+import { useMutation, useQuery, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
 import { formatDate } from "@/lib/format";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
 import { CertificateStatusBadge } from "../components/certificate-status-badge";
@@ -16,13 +18,63 @@ const inputClass =
 const CHANGE_STATUSES = ["SUSPENDED", "CANCELLED", "REVOKED", "SUPERSEDED"] as const;
 
 export function AdminCertificatesSection() {
-  const queryClient = useQueryClient();
   const [targetId, setTargetId] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState<string>("SUSPENDED");
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const certsQuery = useQuery(orpc.certificates.list.queryOptions({ input: { page: 1, limit: 100 } }));
+  return (
+    <div className="flex flex-col gap-6">
+      {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
+
+      <Suspense fallback={<AdminCertificatesSkeleton />}>
+        <QueryErrorBoundary>
+          <AdminCertificatesContent
+            targetId={targetId}
+            newStatus={newStatus}
+            reason={reason}
+            onTargetIdChange={setTargetId}
+            onNewStatusChange={setNewStatus}
+            onReasonChange={setReason}
+            onError={setError}
+          />
+        </QueryErrorBoundary>
+      </Suspense>
+    </div>
+  );
+}
+
+export function AdminCertificatesSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      <Skeleton className="h-24 w-full" />
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Skeleton key={i} className="h-12 w-full" />
+      ))}
+    </div>
+  );
+}
+
+function AdminCertificatesContent({
+  targetId,
+  newStatus,
+  reason,
+  onTargetIdChange,
+  onNewStatusChange,
+  onReasonChange,
+  onError,
+}: {
+  targetId: string | null;
+  newStatus: string;
+  reason: string;
+  onTargetIdChange: (id: string | null) => void;
+  onNewStatusChange: (s: string) => void;
+  onReasonChange: (r: string) => void;
+  onError: (e: string | null) => void;
+}) {
+  const queryClient = useQueryClient();
+
+  const { data } = useSuspenseQuery(orpc.certificates.list.queryOptions({ input: { page: 1, limit: 100 } }));
   const passedQuery = useQuery(
     orpc.applications.listQueue.queryOptions({ input: { page: 1, limit: 100, status: "PASSED" } }),
   );
@@ -36,25 +88,20 @@ export function AdminCertificatesSection() {
   const updateStatus = useMutation(orpc.certificates.updateStatus.mutationOptions({ onSuccess: invalidate }));
 
   async function run(fn: () => Promise<unknown>) {
-    setError(null);
+    onError(null);
     try {
       await fn();
-      setTargetId(null);
-      setReason("");
+      onTargetIdChange(null);
+      onReasonChange("");
     } catch (err) {
-      setError(describeError(err));
+      onError(describeError(err));
     }
   }
-
-  if (certsQuery.isPending) return <p className="text-sm text-muted-foreground">Loading certificates…</p>;
-  if (certsQuery.error) return <p className="text-sm text-destructive">Failed to load certificates.</p>;
 
   const passed = passedQuery.data?.items ?? [];
 
   return (
     <div className="flex flex-col gap-6">
-      {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
-
       <section className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">Issue certificates</h2>
         <p className="text-xs text-muted-foreground">Passed applications awaiting certificate issuance.</p>
@@ -78,7 +125,7 @@ export function AdminCertificatesSection() {
       </section>
 
       <DataTable<CertificateOutput>
-        rows={certsQuery.data?.items ?? []}
+        rows={data.items}
         getRowKey={(r) => r.id}
         emptyTitle="No certificates issued"
         columns={[
@@ -102,7 +149,7 @@ export function AdminCertificatesSection() {
             header: "",
             cell: (r) =>
               r.status === "ACTIVE" || r.status === "EXPIRING_SOON" ? (
-                <Button variant="outline" size="sm" onClick={() => { setTargetId(r.id); setNewStatus("SUSPENDED"); setReason(""); }}>
+                <Button variant="outline" size="sm" onClick={() => { onTargetIdChange(r.id); onNewStatusChange("SUSPENDED"); onReasonChange(""); }}>
                   Change status
                 </Button>
               ) : null,
@@ -116,7 +163,7 @@ export function AdminCertificatesSection() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-muted-foreground">New status</span>
-              <select className={inputClass} value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
+              <select className={inputClass} value={newStatus} onChange={(e) => onNewStatusChange(e.target.value)}>
                 {CHANGE_STATUSES.map((s) => (
                   <option key={s} value={s}>{s.toLowerCase()}</option>
                 ))}
@@ -124,15 +171,15 @@ export function AdminCertificatesSection() {
             </div>
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-muted-foreground">Reason</span>
-              <input className={inputClass} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Required" />
+              <input className={inputClass} value={reason} onChange={(e) => onReasonChange(e.target.value)} placeholder="Required" />
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setTargetId(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => onTargetIdChange(null)}>Cancel</Button>
             <Button
               variant="destructive"
               disabled={updateStatus.isPending || reason.trim().length < 1}
-              onClick={() => run(() => updateStatus.mutateAsync({ id: targetId, status: newStatus as typeof CHANGE_STATUSES[number], reason: reason.trim() }))}
+              onClick={() => run(() => updateStatus.mutateAsync({ id: targetId, status: newStatus as (typeof CHANGE_STATUSES)[number], reason: reason.trim() }))}
             >
               {updateStatus.isPending ? "Updating…" : "Apply status change"}
             </Button>

@@ -1,13 +1,21 @@
-import { AdminCertificatesSection } from "@/modules/certificates/ui/sections/admin-certificates-section";
+import { orpc } from "@/lib/orpc-query.server";
+import { getQueryClient } from "@/lib/query-client.server";
+import { HydrateClient } from "@/components/hydrate-client";
+import { AdminCertificatesView } from "@/modules/certificates/ui/views/admin-certificates-view";
 
-export default function AdminCertificatesPage() {
+export default async function AdminCertificatesPage() {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(
+    orpc.certificates.list.queryOptions({ input: { page: 1, limit: 100 } }),
+  );
+  void queryClient.prefetchQuery(
+    orpc.applications.listQueue.queryOptions({ input: { page: 1, limit: 100, status: "PASSED" } }),
+  );
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Certificates</h1>
-        <p className="text-sm text-muted-foreground">Issue certificates for passed applications and manage certificate status.</p>
-      </header>
-      <AdminCertificatesSection />
-    </div>
+    <HydrateClient>
+      <AdminCertificatesView />
+    </HydrateClient>
   );
 }

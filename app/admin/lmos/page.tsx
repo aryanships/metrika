@@ -1,13 +1,24 @@
-import { AdminLmosSection } from "@/modules/organizations/ui/sections/admin-lmos-section";
+import { orpc } from "@/lib/orpc-query.server";
+import { getQueryClient } from "@/lib/query-client.server";
+import { HydrateClient } from "@/components/hydrate-client";
+import { AdminLmosView } from "@/modules/organizations/ui/views/admin-lmos-view";
 
-export default function AdminLmosPage() {
+export default async function AdminLmosPage() {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(
+    orpc.organizations.listLmos.queryOptions({ input: { page: 1, limit: 200, activeOnly: false } }),
+  );
+  void queryClient.prefetchQuery(
+    orpc.masters.listAdministrativeUnits.queryOptions({ input: { type: "DISTRICT", page: 1, limit: 200 } }),
+  );
+  void queryClient.prefetchQuery(
+    orpc.masters.listInstrumentTypes.queryOptions({ input: { page: 1, limit: 100 } }),
+  );
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Legal Metrology Officers</h1>
-        <p className="text-sm text-muted-foreground">Provision officers, set expertise, and assign jurisdictions.</p>
-      </header>
-      <AdminLmosSection />
-    </div>
+    <HydrateClient>
+      <AdminLmosView />
+    </HydrateClient>
   );
 }

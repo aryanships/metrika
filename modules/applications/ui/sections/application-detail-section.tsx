@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
 import { formatDateTime } from "@/lib/format";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { AttachmentList } from "@/components/attachment-list";
 import { ApplicationStatusBadge } from "../components/application-status-badge";
@@ -22,6 +24,30 @@ function humanize(value: string): string {
 }
 
 export function ApplicationDetailSection({ id }: { id: string }) {
+  return (
+    <Suspense key={id} fallback={<ApplicationDetailSkeleton />}>
+      <QueryErrorBoundary>
+        <ApplicationDetailContent id={id} />
+      </QueryErrorBoundary>
+    </Suspense>
+  );
+}
+
+export function ApplicationDetailSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-72" />
+      </div>
+      <Skeleton className="h-40 w-full" />
+      <Skeleton className="h-32 w-full" />
+      <Skeleton className="h-24 w-full" />
+    </div>
+  );
+}
+
+function ApplicationDetailContent({ id }: { id: string }) {
   const queryClient = useQueryClient();
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -29,7 +55,7 @@ export function ApplicationDetailSection({ id }: { id: string }) {
   const [endAt, setEndAt] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const query = useQuery(orpc.applications.detail.queryOptions({ input: { id } }));
+  const { data } = useSuspenseQuery(orpc.applications.detail.queryOptions({ input: { id } }));
 
   const submit = useMutation(
     orpc.applications.submit.mutationOptions({
@@ -47,11 +73,7 @@ export function ApplicationDetailSection({ id }: { id: string }) {
     }),
   );
 
-  if (query.isPending) return <p className="text-sm text-muted-foreground">Loading application…</p>;
-  if (query.error) return <p className="text-sm text-destructive">Failed to load application.</p>;
-  if (!query.data) return null;
-
-  const { application, statusHistory, completeness } = query.data;
+  const { application, statusHistory, completeness } = data;
   const status = application.status;
   const editable = EDITABLE_STATUSES.includes(status);
   const cancellable = CANCELLABLE_STATUSES.includes(status);

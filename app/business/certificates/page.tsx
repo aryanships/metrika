@@ -1,13 +1,18 @@
-import { CertificatesListSection } from "@/modules/certificates/ui/sections/certificates-list-section";
+import { orpc } from "@/lib/orpc-query.server";
+import { getQueryClient } from "@/lib/query-client.server";
+import { HydrateClient } from "@/components/hydrate-client";
+import { CertificatesView } from "@/modules/certificates/ui/views/certificates-view";
 
-export default function CertificatesPage() {
+export default async function CertificatesPage() {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(
+    orpc.certificates.listMine.queryOptions({ input: { page: 1, limit: 100 } }),
+  );
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Certificates</h1>
-        <p className="text-sm text-muted-foreground">Prototype verification certificates issued for your instruments.</p>
-      </header>
-      <CertificatesListSection />
-    </div>
+    <HydrateClient>
+      <CertificatesView />
+    </HydrateClient>
   );
 }

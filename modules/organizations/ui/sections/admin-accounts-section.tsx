@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Suspense, useState } from "react";
+import { useMutation, useQuery, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
 import { Field, inputClass } from "@/modules/masters/ui/field";
@@ -19,6 +21,26 @@ const SCOPE_TYPE: Partial<Record<AdminRole, "STATE" | "DISTRICT">> = {
 const EMPTY = { email: "", fullName: "", phone: "", role: "STATE_ADMIN" as AdminRole };
 
 export function AdminAccountsSection() {
+  return (
+    <Suspense fallback={<AdminAccountsSkeleton />}>
+      <QueryErrorBoundary>
+        <AdminAccountsContent />
+      </QueryErrorBoundary>
+    </Suspense>
+  );
+}
+
+export function AdminAccountsSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Skeleton key={i} className="h-12 w-full" />
+      ))}
+    </div>
+  );
+}
+
+function AdminAccountsContent() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(EMPTY);
@@ -28,7 +50,7 @@ export function AdminAccountsSection() {
   const [error, setError] = useState<string | null>(null);
   const [invitation, setInvitation] = useState<string | null>(null);
 
-  const adminsQuery = useQuery(orpc.organizations.listAdmins.queryOptions({ input: { page: 1, limit: 100 } }));
+  const { data } = useSuspenseQuery(orpc.organizations.listAdmins.queryOptions({ input: { page: 1, limit: 100 } }));
   const unitsQuery = useQuery(orpc.masters.listAdministrativeUnits.queryOptions({ input: { page: 1, limit: 100 } }));
 
   const provision = useMutation(
@@ -91,8 +113,6 @@ export function AdminAccountsSection() {
     setError(null);
   }
 
-  if (adminsQuery.isPending) return <p className="text-sm text-muted-foreground">Loading admin accounts…</p>;
-
   return (
     <div className="flex flex-col gap-4">
       {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
@@ -153,7 +173,7 @@ export function AdminAccountsSection() {
       )}
 
       <DataTable<AdminAccountOutput>
-        rows={adminsQuery.data?.items ?? []}
+        rows={data.items}
         getRowKey={(a) => a.userId}
         emptyTitle="No admin accounts"
         columns={[

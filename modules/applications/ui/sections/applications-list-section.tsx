@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { formatDate } from "@/lib/format";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ApplicationStatusBadge } from "../components/application-status-badge";
 import { EmptyState } from "@/components/empty-state";
 import type { ApplicationStatus, ApplicationType } from "../../schema";
@@ -45,22 +47,6 @@ export function ApplicationsListSection() {
   const [status, setStatus] = useState<string>("");
   const [type, setType] = useState<string>("");
 
-  const query = useQuery(
-    orpc.applications.listMine.queryOptions({
-      input: {
-        page: 1,
-        limit: 100,
-        status: (status || undefined) as ApplicationStatus | undefined,
-        type: (type || undefined) as ApplicationType | undefined,
-      },
-    }),
-  );
-
-  if (query.isPending) return <p className="text-sm text-muted-foreground">Loading applications…</p>;
-  if (query.error) return <p className="text-sm text-destructive">Failed to load applications.</p>;
-
-  const applications = query.data?.items ?? [];
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-2">
@@ -78,38 +64,82 @@ export function ApplicationsListSection() {
         </select>
       </div>
 
-      {applications.length === 0 ? (
-        <EmptyState
-          title="No applications"
-          description="Apply for verification or a certificate service to get started."
-          action={
-            <Link href="/business/applications/new" className="text-sm font-medium text-primary hover:underline">
-              New application
-            </Link>
-          }
-        />
-      ) : (
-        <div className="flex flex-col gap-2">
-          {applications.map((app) => (
-            <Link
-              key={app.id}
-              href={`/business/applications/${app.id}`}
-              className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:border-ring"
-            >
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-medium">{app.applicationCode}</span>
-                  <span className="text-xs capitalize text-muted-foreground">{humanize(app.type)}</span>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {app.instrumentCode} · {formatDate(app.createdAt)}
-                </span>
-              </div>
-              <ApplicationStatusBadge status={app.status} />
-            </Link>
-          ))}
+      <Suspense key={`${status}-${type}`} fallback={<ApplicationsListSkeleton />}>
+        <QueryErrorBoundary>
+          <ApplicationsListContent
+            status={(status || undefined) as ApplicationStatus | undefined}
+            type={(type || undefined) as ApplicationType | undefined}
+          />
+        </QueryErrorBoundary>
+      </Suspense>
+    </div>
+  );
+}
+
+export function ApplicationsListSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-3 w-48" />
+          </div>
+          <Skeleton className="h-6 w-24 rounded-full" />
         </div>
-      )}
+      ))}
+    </div>
+  );
+}
+
+function ApplicationsListContent({ status, type }: { status?: ApplicationStatus; type?: ApplicationType }) {
+  const { data } = useSuspenseQuery(
+    orpc.applications.listMine.queryOptions({
+      input: {
+        page: 1,
+        limit: 100,
+        status: (status || undefined) as ApplicationStatus | undefined,
+        type: (type || undefined) as ApplicationType | undefined,
+      },
+    }),
+  );
+
+  const applications = data.items;
+
+  if (applications.length === 0) {
+    return (
+      <EmptyState
+        title="No applications"
+        description="Apply for verification or a certificate service to get started."
+        action={
+          <Link href="/business/applications/new" className="text-sm font-medium text-primary hover:underline">
+            New application
+          </Link>
+        }
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {applications.map((app) => (
+        <Link
+          key={app.id}
+          href={`/business/applications/${app.id}`}
+          className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:border-ring"
+        >
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <div className="flex items-center gap-2">
+              <span className="font-mono font-medium">{app.applicationCode}</span>
+              <span className="text-xs capitalize text-muted-foreground">{humanize(app.type)}</span>
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {app.instrumentCode} · {formatDate(app.createdAt)}
+            </span>
+          </div>
+          <ApplicationStatusBadge status={app.status} />
+        </Link>
+      ))}
     </div>
   );
 }

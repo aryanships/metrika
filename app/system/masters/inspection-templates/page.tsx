@@ -1,15 +1,21 @@
-import { InspectionTemplatesSection } from "@/modules/masters/ui/sections/inspection-templates-section";
+import { orpc } from "@/lib/orpc-query.server";
+import { getQueryClient } from "@/lib/query-client.server";
+import { HydrateClient } from "@/components/hydrate-client";
+import { InspectionTemplatesView } from "@/modules/masters/ui/views/inspection-templates-view";
 
-export default function InspectionTemplatesPage() {
+export default async function InspectionTemplatesPage() {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(
+    orpc.masters.listInspectionTemplates.queryOptions({ input: { page: 1, limit: 100 } }),
+  );
+  void queryClient.prefetchQuery(
+    orpc.masters.listInstrumentTypes.queryOptions({ input: { page: 1, limit: 100 } }),
+  );
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Inspection templates</h1>
-        <p className="text-sm text-muted-foreground">
-          Versioned, category-specific inspection forms with ordered items.
-        </p>
-      </header>
-      <InspectionTemplatesSection />
-    </div>
+    <HydrateClient>
+      <InspectionTemplatesView />
+    </HydrateClient>
   );
 }

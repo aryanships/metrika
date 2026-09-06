@@ -1,21 +1,18 @@
-import Link from "next/link";
-import { ApplicationsListSection } from "@/modules/applications/ui/sections/applications-list-section";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { orpc } from "@/lib/orpc-query.server";
+import { getQueryClient } from "@/lib/query-client.server";
+import { HydrateClient } from "@/components/hydrate-client";
+import { ApplicationsView } from "@/modules/applications/ui/views/applications-view";
 
-export default function ApplicationsPage() {
+export default async function ApplicationsPage() {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(
+    orpc.applications.listMine.queryOptions({ input: { page: 1, limit: 100 } }),
+  );
+
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Applications</h1>
-          <p className="text-sm text-muted-foreground">Verification and certificate service requests for your instruments.</p>
-        </div>
-        <Link href="/business/applications/new" className={cn(buttonVariants({ size: "sm" }))}>
-          New application
-        </Link>
-      </header>
-      <ApplicationsListSection />
-    </div>
+    <HydrateClient>
+      <ApplicationsView />
+    </HydrateClient>
   );
 }

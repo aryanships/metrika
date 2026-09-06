@@ -1,13 +1,18 @@
-import { AdminApplicationsSection } from "@/modules/applications/ui/sections/admin-applications-section";
+import { orpc } from "@/lib/orpc-query.server";
+import { getQueryClient } from "@/lib/query-client.server";
+import { HydrateClient } from "@/components/hydrate-client";
+import { AdminApplicationsView } from "@/modules/applications/ui/views/admin-applications-view";
 
-export default function AdminApplicationsPage() {
+export default async function AdminApplicationsPage() {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(
+    orpc.applications.listQueue.queryOptions({ input: { page: 1, limit: 20, sortOrder: "asc" } }),
+  );
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Review queue</h1>
-        <p className="text-sm text-muted-foreground">Filter and process submitted verification applications.</p>
-      </header>
-      <AdminApplicationsSection />
-    </div>
+    <HydrateClient>
+      <AdminApplicationsView />
+    </HydrateClient>
   );
 }

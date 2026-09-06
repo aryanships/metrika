@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Suspense, useState } from "react";
+import { useMutation, useQuery, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
+import { QueryErrorBoundary } from "@/components/query-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
 import type { LmoOutput } from "../../schema";
@@ -64,6 +66,26 @@ const EMPTY = {
 };
 
 export function AdminLmosSection() {
+  return (
+    <Suspense fallback={<AdminLmosSkeleton />}>
+      <QueryErrorBoundary>
+        <AdminLmosContent />
+      </QueryErrorBoundary>
+    </Suspense>
+  );
+}
+
+export function AdminLmosSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Skeleton key={i} className="h-14 w-full" />
+      ))}
+    </div>
+  );
+}
+
+function AdminLmosContent() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY);
@@ -72,7 +94,7 @@ export function AdminLmosSection() {
   const [error, setError] = useState<string | null>(null);
   const [invitation, setInvitation] = useState<string | null>(null);
 
-  const lmosQuery = useQuery(
+  const { data } = useSuspenseQuery(
     orpc.organizations.listLmos.queryOptions({ input: { page: 1, limit: 200, activeOnly: false } }),
   );
   const districtsQuery = useQuery(
@@ -116,9 +138,6 @@ export function AdminLmosSection() {
       setError(describeError(err));
     }
   }
-
-  if (lmosQuery.isPending) return <p className="text-sm text-muted-foreground">Loading LMOs…</p>;
-  if (lmosQuery.error) return <p className="text-sm text-destructive">Failed to load LMOs.</p>;
 
   return (
     <div className="flex flex-col gap-4">
@@ -186,7 +205,7 @@ export function AdminLmosSection() {
       )}
 
       <DataTable<LmoOutput>
-        rows={lmosQuery.data?.items ?? []}
+        rows={data.items}
         getRowKey={(r) => r.id}
         emptyTitle="No LMOs provisioned"
         columns={[
