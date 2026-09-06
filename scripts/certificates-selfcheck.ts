@@ -152,6 +152,62 @@ async function main(): Promise<void> {
     }
   }
 
+  // 4. GATC field authority: a GATC operator (no global role) issues for a
+  //    GATC-routed inspection performed by another centre member.
+  const gatcOperator = await loadUser("operator.apex@gatc.org", []);
+  const gatcManager = await loadUser("manager.apex@gatc.org", []);
+  const gatc = await db.orm.public.Gatc.where({ approvalNumber: "GATC-MH-PUN-001" }).first();
+  if (!gatc) throw new Error("Missing GATC-MH-PUN-001");
+  const operatorMembership = await db.orm.public.GatcMembership.where({
+    userId: gatcOperator.id,
+    gatcId: gatc.id,
+    isActive: true,
+  }).first();
+  if (!operatorMembership) throw new Error("Missing operator membership for Apex GATC");
+
+  const gatcInstrument = await db.orm.public.Instrument.where({ instrumentCode: "DMI-EWB-001" }).first();
+  if (!gatcInstrument) throw new Error("Missing DMI-EWB-001 instrument");
+  const gatcRule = await db.orm.public.RegulatoryRule
+    .where({ instrumentTypeId: gatcInstrument.instrumentTypeId, accuracyClass: gatcInstrument.accuracyClass ?? "" })
+    .first();
+  if (!gatcRule) throw new Error("Missing rule for DMI-EWB-001");
+
+  const gatcCreated = { applicationId: "", inspectionId: "", certificateId: "" };
+  try {
+    const app = await db.orm.public.Application.create({
+      applicationCode: `APP-GATC-SELFCHECK-${Date.now()}`,
+      instrumentId: gatcInstrument.id,
+      type: "RE_VERIFICATION",
+      status: "PASSED",
+      route: "GATC",
+      priority: "MEDIUM",
+    });
+    gatcCreated.applicationId = app.id;
+
+    await db.orm.public.Inspection.create({
+      applicationId: app.id,
+      lmoId: null,
+      gatcId: gatc.id,
+      performedById: gatcManager.id,
+      startedAt: new Date().toISOString(),
+      submittedAt: new Date().toISOString(),
+      finalizedAt: new Date().toISOString(),
+      finalizedById: gatcManager.id,
+      result: "PASS",
+      ruleVersionId: gatcRule.id,
+      templateId: null,
+      notes: null,
+    });
+
+    const issued = await certificatesService.issue({ applicationId: app.id }, gatcOperator);
+    gatcCreated.certificateId = issued.id;
+    assert.equal(issued.status, "ACTIVE");
+  } finally {
+    if (gatcCreated.certificateId) await db.orm.public.Certificate.where({ id: gatcCreated.certificateId }).delete();
+    if (gatcCreated.inspectionId) await db.orm.public.Inspection.where({ id: gatcCreated.inspectionId }).delete();
+    if (gatcCreated.applicationId) await db.orm.public.Application.where({ id: gatcCreated.applicationId }).delete();
+  }
+
   console.log("certificates self-check passed");
 }
 

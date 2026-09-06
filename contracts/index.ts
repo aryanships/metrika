@@ -12,6 +12,7 @@ import { verificationContract } from "@/modules/verification/contract";
 import { notificationsContract } from "@/modules/notifications/contract";
 import { auditContract } from "@/modules/audit/contract";
 import { dashboardContract } from "@/modules/dashboard/contract";
+import { searchContract } from "@/modules/search/contract";
 
 export const appContract = {
   auth: authContract,
@@ -28,6 +29,7 @@ export const appContract = {
   notifications: notificationsContract,
   audit: auditContract,
   dashboard: dashboardContract,
+  search: searchContract,
 };
 
 export type AppContract = typeof appContract;

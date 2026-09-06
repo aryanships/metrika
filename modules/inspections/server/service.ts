@@ -335,7 +335,7 @@ export const inspectionsService = {
       : null;
 
     const applyResponses = async (orm: Orm, responses: ResponseInput[]) => {
-      await orm.InspectionTemplateResponse.where({ inspectionId: ctx.inspection.id }).delete();
+      await orm.InspectionTemplateResponse.where({ inspectionId: ctx.inspection.id }).deleteAll();
       for (const r of responses) {
         const item = ctx.inspection.templateId
           ? await orm.InspectionTemplateItem.first({ id: r.templateItemId })
@@ -355,7 +355,7 @@ export const inspectionsService = {
     };
 
     const applyObservations = async (orm: Orm, observations: ObservationInput[]) => {
-      await orm.InspectionObservation.where({ inspectionId: ctx.inspection.id }).delete();
+      await orm.InspectionObservation.where({ inspectionId: ctx.inspection.id }).deleteAll();
       for (const o of observations) {
         await orm.InspectionObservation.create({
           inspectionId: ctx.inspection.id,
@@ -375,7 +375,7 @@ export const inspectionsService = {
       }
       if (input.measurements !== undefined) {
         if (!rule) validation("rule", "Cannot record measurements without an applicable rule");
-        await orm.InspectionMeasurement.where({ inspectionId: ctx.inspection.id }).delete();
+        await orm.InspectionMeasurement.where({ inspectionId: ctx.inspection.id }).deleteAll();
         for (const m of input.measurements) {
           const { observedError, withinLimit } = computeMeasurement(
             m.standardValue,
@@ -410,6 +410,32 @@ export const inspectionsService = {
 
     const measurements = await db.orm.public.InspectionMeasurement.where({ inspectionId: ctx.inspection.id }).all();
     if (measurements.length === 0) validation("measurements", "Record at least one measurement before submitting");
+
+    // Enforce required (non-measurement) template items.
+    const templateItems = ctx.inspection.templateId
+      ? await db.orm.public.InspectionTemplateItem.where({ templateId: ctx.inspection.templateId }).all()
+      : [];
+    const responses = await db.orm.public.InspectionTemplateResponse.where({ inspectionId: ctx.inspection.id }).all();
+    const responseByItem = new Map(responses.map((r) => [r.templateItemId, r]));
+    const missingRequired = templateItems.filter((item) => {
+      if (!item.isRequired || item.kind === "MEASUREMENT") return false;
+      const response = responseByItem.get(item.id);
+      if (!response) return true;
+      const value = response.value as boolean | number | string | null;
+      if (item.kind === "CHECKLIST") return typeof value !== "boolean";
+      if (item.kind === "NUMERIC") return typeof value !== "number";
+      return typeof value !== "string" || value.trim() === "";
+    });
+    if (missingRequired.length > 0) {
+      throw new ORPCError("VALIDATION_ERROR", {
+        data: {
+          issues: missingRequired.map((item) => ({
+            path: "responses",
+            message: `Required item not completed: ${item.label}`,
+          })),
+        },
+      });
+    }
 
     const attachments = await db.orm.public.Attachment.where({ inspectionId: ctx.inspection.id }).all();
     const presentKinds = new Set(attachments.map((a) => a.kind));

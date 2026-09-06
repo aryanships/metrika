@@ -1,10 +1,12 @@
 import { base } from "@/contracts/base";
 import {
   AttachmentOutputSchema,
+  AttachmentTargetSchema,
   ConfirmUploadInputSchema,
   CreateUploadIntentInputSchema,
   DownloadUrlOutputSchema,
   GetDownloadUrlInputSchema,
+  ListAttachmentsOutputSchema,
   UploadIntentOutputSchema,
 } from "./schema";
 
@@ -42,8 +44,20 @@ export const getDownloadUrlContract = base
   .input(GetDownloadUrlInputSchema)
   .output(DownloadUrlOutputSchema);
 
+export const listAttachmentsContract = base
+  .route({
+    method: "GET",
+    path: "/files/attachments",
+    summary: "List attachments for a target",
+    description: "Lists uploaded documents, photos, and evidence for an instrument, application, or inspection.",
+    tags: ["Files"],
+  })
+  .input(AttachmentTargetSchema)
+  .output(ListAttachmentsOutputSchema);
+
 export const filesContract = {
   createUploadIntent: createUploadIntentContract,
   confirmUpload: confirmUploadContract,
   getDownloadUrl: getDownloadUrlContract,
+  listAttachments: listAttachmentsContract,
 };

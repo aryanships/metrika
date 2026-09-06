@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { CertificateStatusBadge } from "../components/certificate-status-badge";
@@ -39,12 +40,22 @@ export function CertificateDetailSection({ id }: { id: string }) {
             <CertificateStatusBadge status={data.status} />
           </div>
         </div>
-        <button
-          onClick={() => window.print()}
-          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/80 print:hidden"
-        >
-          Print / Save PDF
-        </button>
+        <div className="flex items-center gap-2 print:hidden">
+          {(data.status === "EXPIRED" || data.status === "EXPIRING_SOON") && (
+            <Link
+              href={`/business/applications/new?instrumentId=${data.instrumentId}&type=RE_VERIFICATION`}
+              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/80"
+            >
+              Apply for re-verification
+            </Link>
+          )}
+          <button
+            onClick={() => window.print()}
+            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+          >
+            Print / Save PDF
+          </button>
+        </div>
       </header>
 
       <section className="grid gap-8 rounded-xl border border-border bg-card p-6 md:grid-cols-[1fr_auto]">

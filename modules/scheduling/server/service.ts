@@ -3,6 +3,8 @@ import { db } from "@/prisma/db";
 import { paginationMeta } from "@/schemas/shared";
 import { requireStateScope } from "@/middleware/require-state-scope";
 import { ancestorUnitIds, descendantUnitIds } from "@/lib/geo";
+import { notifyBusinessOwner, notifyWorkOrderAssignees } from "@/lib/notify";
+import { distanceBetween, scoreBreakdown } from "./scoring";
 import { assertTransition } from "@/modules/applications/server/state-machine";
 import type { AppUser } from "@/middleware/context";
 import type { UserRole } from "@/modules/auth/schema";
@@ -43,17 +45,8 @@ function invalidState(current: string, reason: string): never {
   throw new ORPCError("INVALID_STATE", { data: { currentState: current, reason } });
 }
 
-function clamp(n: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, n));
-}
-
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const rad = (d: number) => (d * Math.PI) / 180;
-  const dLat = rad(lat2 - lat1);
-  const dLng = rad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return 2 * 6371 * Math.asin(Math.sqrt(a));
+function formatWindow(iso: string): string {
+  return new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 }
 
 function toWorkOrderOutput(row: WorkOrderRow): WorkOrderOutput {
@@ -175,8 +168,6 @@ function scoreCandidate(
   schedule: { open: number; windows: { start: string | null; end: string | null }[] },
 ): CandidateScore {
   const distanceKm = distanceBetween(instrument.latitude, instrument.longitude, candidate.latitude, candidate.longitude);
-  const distance = distanceKm === null ? 50 : clamp(100 - distanceKm * 5, 0, 100);
-  const workload = clamp(100 - schedule.open * 10, 0, 100);
 
   const start = application.preferredStartAt;
   const end = application.preferredEndAt;
@@ -186,30 +177,23 @@ function scoreCandidate(
     schedule.windows.some(
       (w) => w.start && w.end && Date.parse(w.start) <= Date.parse(end) && Date.parse(w.end) >= Date.parse(start),
     );
-  const availability = hasConflict ? 0 : 100;
 
-  const total = Math.round((0.5 * distance + 0.3 * workload + 0.2 * availability) * 10) / 10;
+  const s = scoreBreakdown({ distanceKm, openWorkOrders: schedule.open, hasConflict });
 
   return {
     candidateId: candidate.id,
     candidateType: candidate.type,
     name: candidate.name,
     detail: candidate.detail,
-    totalScore: total,
-    breakdown: { distanceScore: distance, workloadScore: workload, availabilityScore: availability },
+    totalScore: s.totalScore,
+    breakdown: {
+      distanceScore: s.distanceScore,
+      workloadScore: s.workloadScore,
+      availabilityScore: s.availabilityScore,
+    },
     currentWorkload: schedule.open,
     estimatedDistanceKm: distanceKm,
   };
-}
-
-function distanceBetween(
-  aLat: string | null,
-  aLng: string | null,
-  bLat: string | null,
-  bLng: string | null,
-): number | null {
-  if (!aLat || !aLng || !bLat || !bLng) return null;
-  return haversineKm(Number(aLat), Number(aLng), Number(bLat), Number(bLng));
 }
 
 async function buildRecommendation(application: ApplicationRow, instrument: InstrumentRow): Promise<RecommendCandidatesOutput> {
@@ -277,6 +261,17 @@ export const schedulingService = {
         lmoId: input.route === "LMO" ? input.assigneeId : null,
         gatcId: input.route === "GATC" ? input.assigneeId : null,
         recommendedScore: String(chosen.totalScore),
+        recommendation: {
+          chosenCandidateId: chosen.candidateId,
+          chosenName: chosen.name,
+          chosenDetail: chosen.detail,
+          totalScore: chosen.totalScore,
+          breakdown: chosen.breakdown,
+          estimatedDistanceKm: chosen.estimatedDistanceKm,
+          currentWorkload: chosen.currentWorkload,
+          recommendedRoute: recommendation.recommendedRoute,
+          wasOverridden,
+        } as never,
         wasOverridden,
         assignedById: user.id,
         assignedAt: new Date().toISOString(),
@@ -340,6 +335,21 @@ export const schedulingService = {
     });
 
     const updated = await db.orm.public.WorkOrder.first({ id: workOrder.id });
+
+    const appointment = {
+      event: "APPOINTMENT_SCHEDULED",
+      title: "Inspection appointment scheduled",
+      message: `An inspection for ${instrument.instrumentCode} is scheduled for ${formatWindow(input.scheduledStartAt)} at ${input.location ?? "the client site"}.`,
+      extra: { applicationId: application.id },
+    };
+    await notifyBusinessOwner(db.orm.public, instrument.businessId, appointment);
+    await notifyWorkOrderAssignees(db.orm.public, { lmoId: workOrder.lmoId, gatcId: workOrder.gatcId }, {
+      event: "APPOINTMENT_SCHEDULED",
+      title: "New inspection appointment",
+      message: `You have a new inspection scheduled for ${instrument.instrumentCode} on ${formatWindow(input.scheduledStartAt)}.`,
+      extra: { applicationId: application.id },
+    });
+
     return toWorkOrderOutput(updated!);
   },
 
@@ -365,6 +375,7 @@ export const schedulingService = {
     }
 
     if (input.route) query = query.where({ route: input.route });
+    if (input.applicationId) query = query.where({ applicationId: input.applicationId });
 
     const [rows, totals] = await Promise.all([
       query.orderBy((w) => w.assignedAt.desc()).offset((page - 1) * limit).limit(limit).all(),

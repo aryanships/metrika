@@ -2,9 +2,13 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createInitialContext } from "@/middleware/context";
 import { db } from "@/prisma/db";
-import { RoleNav } from "@/components/role-nav";
+import { AppShell } from "@/components/app-shell";
 
-const LINKS = [{ href: "/field", label: "Dashboard" }];
+const LINKS = [
+  { href: "/field", label: "Dashboard" },
+  { href: "/field/work-orders", label: "Work orders" },
+  { href: "/field/certificates", label: "Certificates" },
+];
 
 export default async function FieldLayout({ children }: { children: React.ReactNode }) {
   const { user } = await createInitialContext(await headers());
@@ -19,9 +23,8 @@ export default async function FieldLayout({ children }: { children: React.ReactN
   if (!isLmo && !membership) redirect("/login");
 
   return (
-    <div className="min-h-full">
-      <RoleNav name={user.fullName} email={user.email} links={LINKS} />
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
-    </div>
+    <AppShell user={user} links={LINKS}>
+      {children}
+    </AppShell>
   );
 }

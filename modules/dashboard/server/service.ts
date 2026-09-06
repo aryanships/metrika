@@ -219,18 +219,64 @@ async function fieldStats(user: AppUser) {
   };
 }
 
+async function systemStats() {
+  const orm = db.orm.public;
+  const [
+    users, businesses, instruments, applications, certificates, auditEvents,
+    instrumentTypes, regulatoryRules, inspectionTemplates, lmos, gatcs,
+    unitCounts, adminRoles,
+  ] = await Promise.all([
+    orm.User.aggregate((agg) => ({ total: agg.count() })),
+    orm.Business.aggregate((agg) => ({ total: agg.count() })),
+    orm.Instrument.aggregate((agg) => ({ total: agg.count() })),
+    orm.Application.aggregate((agg) => ({ total: agg.count() })),
+    orm.Certificate.aggregate((agg) => ({ total: agg.count() })),
+    orm.AuditLog.aggregate((agg) => ({ total: agg.count() })),
+    orm.InstrumentType.aggregate((agg) => ({ total: agg.count() })),
+    orm.RegulatoryRule.aggregate((agg) => ({ total: agg.count() })),
+    orm.InspectionTemplate.aggregate((agg) => ({ total: agg.count() })),
+    orm.Lmo.aggregate((agg) => ({ total: agg.count() })),
+    orm.Gatc.aggregate((agg) => ({ total: agg.count() })),
+    orm.AdministrativeUnit.groupBy("type").aggregate((agg) => ({ total: agg.count() })),
+    orm.UserRole.where((r) => r.role.in(["SYSTEM_ADMIN", "STATE_ADMIN", "DISTRICT_ADMIN", "DEPARTMENT_OFFICIAL"])).select("userId").all(),
+  ]);
+
+  const byType = new Map(unitCounts.map((u) => [u.type, u.total]));
+  return {
+    users: users.total,
+    businesses: businesses.total,
+    instruments: instruments.total,
+    applications: applications.total,
+    certificates: certificates.total,
+    auditEvents: auditEvents.total,
+    states: byType.get("STATE") ?? 0,
+    districts: byType.get("DISTRICT") ?? 0,
+    tehsils: byType.get("TEHSIL") ?? 0,
+    villages: byType.get("VILLAGE") ?? 0,
+    instrumentTypes: instrumentTypes.total,
+    regulatoryRules: regulatoryRules.total,
+    inspectionTemplates: inspectionTemplates.total,
+    lmos: lmos.total,
+    gatcs: gatcs.total,
+    admins: new Set(adminRoles.map((r) => r.userId)).size,
+  };
+}
+
 export const dashboardService = {
   async getStats(user: AppUser): Promise<DashboardStatsOutput> {
+    if (user.roles.includes("SYSTEM_ADMIN")) {
+      return { role: "SYSTEM_ADMIN", owner: null, admin: null, field: null, system: await systemStats() };
+    }
     if (user.roles.includes("INSTRUMENT_OWNER")) {
-      return { role: "INSTRUMENT_OWNER", owner: await ownerStats(user), admin: null, field: null };
+      return { role: "INSTRUMENT_OWNER", owner: await ownerStats(user), admin: null, field: null, system: null };
     }
     if (user.roles.includes("LMO")) {
-      return { role: "LMO", owner: null, admin: null, field: await fieldStats(user) };
+      return { role: "LMO", owner: null, admin: null, field: await fieldStats(user), system: null };
     }
     const membership = await db.orm.public.GatcMembership.where({ userId: user.id, isActive: true }).first();
     if (membership && !isUnrestricted(user) && !SCOPED_ADMIN_ROLES.some((r) => user.roles.includes(r))) {
-      return { role: "GATC", owner: null, admin: null, field: await fieldStats(user) };
+      return { role: "GATC", owner: null, admin: null, field: await fieldStats(user), system: null };
     }
-    return { role: user.roles[0] ?? "ADMIN", owner: null, admin: await adminStats(user), field: null };
+    return { role: user.roles[0] ?? "ADMIN", owner: null, admin: await adminStats(user), field: null, system: null };
   },
 };

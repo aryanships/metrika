@@ -9,7 +9,7 @@ import type { CertificateOutput } from "../../schema";
 function CertificateCard({ certificate }: { certificate: CertificateOutput }) {
   return (
     <Link
-      href={`/owner/certificates/${certificate.id}`}
+      href={`/business/certificates/${certificate.id}`}
       className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 transition-colors hover:border-ring"
     >
       <div className="flex items-start justify-between gap-2">

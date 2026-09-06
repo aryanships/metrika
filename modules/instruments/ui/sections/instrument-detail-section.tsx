@@ -3,9 +3,14 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
+import { formatDate } from "@/lib/format";
 import { InstrumentStatusBadge } from "../components/instrument-status-badge";
 import { CertificateStatusBadge } from "@/modules/certificates/ui/components/certificate-status-badge";
+import { ApplicationStatusBadge } from "@/modules/applications/ui/components/application-status-badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AttachmentList } from "@/components/attachment-list";
 import type { CertificateStatus } from "@/modules/certificates/schema";
+import type { ApplicationStatus } from "@/modules/applications/schema";
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -14,10 +19,6 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
       <dd className="text-sm">{value ?? "—"}</dd>
     </div>
   );
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
 export function InstrumentDetailSection({ id }: { id: string }) {
@@ -36,65 +37,102 @@ export function InstrumentDetailSection({ id }: { id: string }) {
           <h1 className="font-mono text-2xl font-semibold">{instrument.instrumentCode}</h1>
           <InstrumentStatusBadge status={instrument.status} />
         </div>
-        <p className="text-sm text-muted-foreground">{instrument.instrumentTypeName}</p>
+        <p className="text-sm text-muted-foreground">
+          {instrument.instrumentTypeName} · {instrument.manufacturer} {instrument.model}
+        </p>
       </header>
 
-      <dl className="grid gap-4 rounded-lg border border-border bg-card p-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Row label="Manufacturer" value={instrument.manufacturer} />
-        <Row label="Model" value={instrument.model} />
-        <Row label="Serial number" value={instrument.serialNumber} />
-        <Row label="Capacity" value={instrument.capacity ? `${instrument.capacity} ${instrument.instrumentTypeUnit}` : null} />
-        <Row label="Accuracy class" value={instrument.accuracyClass} />
-        <Row label="Year of manufacture" value={instrument.yearOfManufacture} />
-        <Row label="Purchase date" value={instrument.purchaseDate} />
-        <Row label="Location" value={instrument.address} />
-        <Row label="Administrative unit" value={instrument.administrativeUnitName} />
-        <Row label="Postal code" value={instrument.postalCode} />
-      </dl>
+      <Tabs defaultValue="overview">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="certificates">Certificates</TabsTrigger>
+          <TabsTrigger value="applications">Applications</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="photos">Photos</TabsTrigger>
+        </TabsList>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold">Verification history</h2>
-        {certificates.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            {certificates.map((cert) => (
+        <TabsContent value="overview" className="pt-4">
+          <dl className="grid gap-4 rounded-lg border border-border bg-card p-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Row label="Manufacturer" value={instrument.manufacturer} />
+            <Row label="Model" value={instrument.model} />
+            <Row label="Serial number" value={instrument.serialNumber} />
+            <Row label="Capacity" value={instrument.capacity ? `${instrument.capacity} ${instrument.instrumentTypeUnit}` : null} />
+            <Row label="Accuracy class" value={instrument.accuracyClass} />
+            <Row label="Year of manufacture" value={instrument.yearOfManufacture} />
+            <Row label="Purchase date" value={instrument.purchaseDate ? formatDate(instrument.purchaseDate) : null} />
+            <Row label="Location" value={instrument.address} />
+            <Row label="Administrative unit" value={instrument.administrativeUnitName} />
+            <Row label="Postal code" value={instrument.postalCode} />
+          </dl>
+          {data.activeCertificate && (
+            <div className="mt-4">
+              <h3 className="text-sm font-semibold">Active certificate</h3>
               <Link
-                key={cert.id}
-                href={`/owner/certificates/${cert.id}`}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:border-ring"
+                href={`/business/certificates/${data.activeCertificate.id}`}
+                className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:border-ring"
               >
                 <div className="flex flex-col gap-0.5">
-                  <span className="font-mono font-medium">{cert.certificateCode}</span>
-                  <span className="text-xs text-muted-foreground">
-                    Valid until {formatDate(cert.validUntil)}
-                  </span>
+                  <span className="font-mono font-medium">{data.activeCertificate.certificateCode}</span>
+                  <span className="text-xs text-muted-foreground">Valid until {formatDate(data.activeCertificate.validUntil)}</span>
                 </div>
-                <CertificateStatusBadge status={cert.status as CertificateStatus} />
+                <CertificateStatusBadge status={data.activeCertificate.status as CertificateStatus} />
               </Link>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No certificates issued yet.</p>
-        )}
-      </section>
+            </div>
+          )}
+        </TabsContent>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold">Applications</h2>
-        {applications.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            {applications.map((app) => (
-              <div key={app.id} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 text-sm">
-                <div className="flex flex-col gap-0.5">
-                  <span className="font-mono font-medium">{app.applicationCode}</span>
-                  <span className="text-xs text-muted-foreground">{app.type.replaceAll("_", " ").toLowerCase()}</span>
-                </div>
-                <span className="text-xs font-medium">{app.status}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No applications yet.</p>
-        )}
-      </section>
+        <TabsContent value="certificates" className="pt-4">
+          {certificates.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              {certificates.map((cert) => (
+                <Link
+                  key={cert.id}
+                  href={`/business/certificates/${cert.id}`}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:border-ring"
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-mono font-medium">{cert.certificateCode}</span>
+                    <span className="text-xs text-muted-foreground">Valid until {formatDate(cert.validUntil)}</span>
+                  </div>
+                  <CertificateStatusBadge status={cert.status as CertificateStatus} />
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No certificates issued yet.</p>
+          )}
+        </TabsContent>
+
+        <TabsContent value="applications" className="pt-4">
+          {applications.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              {applications.map((app) => (
+                <Link
+                  key={app.id}
+                  href={`/business/applications/${app.id}`}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:border-ring"
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-mono font-medium">{app.applicationCode}</span>
+                    <span className="text-xs capitalize text-muted-foreground">{app.type.toLowerCase().replaceAll("_", " ")}</span>
+                  </div>
+                  <ApplicationStatusBadge status={app.status as ApplicationStatus} />
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No applications yet.</p>
+          )}
+        </TabsContent>
+
+        <TabsContent value="documents" className="pt-4">
+          <AttachmentList target={{ instrumentId: id }} emptyTitle="No documents uploaded" />
+        </TabsContent>
+
+        <TabsContent value="photos" className="pt-4">
+          <AttachmentList target={{ instrumentId: id }} photosOnly emptyTitle="No photos uploaded" />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

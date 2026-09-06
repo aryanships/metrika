@@ -143,3 +143,54 @@ export const CompletenessOutputSchema = z.object({
   checks: z.array(CompletenessCheckSchema),
 });
 export type CompletenessOutput = z.infer<typeof CompletenessOutputSchema>;
+
+export const ApplicationStatusHistoryOutputSchema = z.object({
+  id: z.string(),
+  fromStatus: ApplicationStatusSchema.nullable(),
+  toStatus: ApplicationStatusSchema,
+  reason: z.string().nullable(),
+  changedById: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type ApplicationStatusHistoryOutput = z.infer<typeof ApplicationStatusHistoryOutputSchema>;
+
+export const ApplicationInstrumentSchema = z.object({
+  id: z.string(),
+  instrumentCode: z.string(),
+  instrumentTypeName: z.string(),
+  instrumentTypeUnit: z.string(),
+  manufacturer: z.string(),
+  model: z.string(),
+  serialNumber: z.string(),
+  capacity: z.string().nullable(),
+  accuracyClass: z.string().nullable(),
+  status: z.string(),
+  address: z.string(),
+  administrativeUnitName: z.string(),
+});
+export type ApplicationInstrument = z.infer<typeof ApplicationInstrumentSchema>;
+
+export const ApplicationDetailOutputSchema = z.object({
+  application: ApplicationOutputSchema,
+  instrument: ApplicationInstrumentSchema,
+  businessName: z.string(),
+  contactPhone: z.string().nullable(),
+  contactEmail: z.string().nullable(),
+  appointment: z.object({
+    scheduledStartAt: z.string().nullable(),
+    scheduledEndAt: z.string().nullable(),
+    location: z.string().nullable(),
+  }),
+  priorCertificates: z.array(
+    z.object({
+      id: z.string(),
+      certificateCode: z.string(),
+      verifiedAt: z.string(),
+      validUntil: z.string(),
+      status: z.string(),
+    }),
+  ),
+  statusHistory: z.array(ApplicationStatusHistoryOutputSchema),
+  completeness: CompletenessOutputSchema,
+});
+export type ApplicationDetailOutput = z.infer<typeof ApplicationDetailOutputSchema>;

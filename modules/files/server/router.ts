@@ -16,4 +16,7 @@ export const filesRouter = implementer.router({
   getDownloadUrl: implementer.getDownloadUrl.use(requireAuth).handler(async ({ input, context }) => {
     return filesService.getDownloadUrl(input, context.user!);
   }),
+  listAttachments: implementer.listAttachments.use(requireAuth).handler(async ({ input, context }) => {
+    return filesService.listAttachments(input, context.user!);
+  }),
 });

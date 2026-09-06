@@ -531,6 +531,7 @@ model WorkOrder {
   lmoId            String?
   gatcId           String?
   recommendedScore Decimal?
+  recommendation   Json?
   wasOverridden    Boolean           @default(false)
   assignedById     String
   assignedAt       TimestamptzString @default(now())

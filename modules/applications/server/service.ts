@@ -4,6 +4,7 @@ import { db } from "@/prisma/db";
 import { paginationMeta } from "@/schemas/shared";
 import { requireStateScope } from "@/middleware/require-state-scope";
 import { descendantUnitIds } from "@/lib/geo";
+import { notifyAdminsForUnit, notifyBusinessOwner } from "@/lib/notify";
 import type { AppUser } from "@/middleware/context";
 import type { UserRole } from "@/modules/auth/schema";
 import { applicationsRepository, UpdateApplicationData } from "./repository";
@@ -15,6 +16,7 @@ import {
 import {
   ApplicationOutput,
   ApplicationStatus,
+  ApplicationDetailOutput,
   CompletenessCheck,
   CompletenessOutput,
   GetApplicationInput,
@@ -124,10 +126,29 @@ async function assertAdminScope(user: AppUser, application: ApplicationRow) {
   forbidden("Not authorized to view this application");
 }
 
+async function assertFieldAccess(user: AppUser, application: ApplicationRow) {
+  const workOrder = await db.orm.public.WorkOrder.where({ applicationId: application.id }).first();
+  if (!workOrder) forbidden("Not authorized to view this application");
+
+  const lmo = user.roles.includes("LMO")
+    ? await db.orm.public.Lmo.where({ userId: user.id, isActive: true }).first()
+    : null;
+  if (lmo && workOrder.lmoId === lmo.id) return;
+  if (workOrder.gatcId) {
+    const membership = await db.orm.public.GatcMembership.where({
+      userId: user.id,
+      gatcId: workOrder.gatcId,
+      isActive: true,
+    }).first();
+    if (membership) return;
+  }
+  forbidden("Not authorized to view this application");
+}
+
 async function assertCanView(user: AppUser, application: ApplicationRow) {
   if (user.roles.includes("INSTRUMENT_OWNER")) return assertOwnerAccess(user, application);
   if (ADMIN_ROLES.some((r) => user.roles.includes(r))) return assertAdminScope(user, application);
-  forbidden("Not authorized to view this application");
+  return assertFieldAccess(user, application);
 }
 
 async function scopedInstrumentIds(user: AppUser): Promise<Set<string> | null> {
@@ -184,8 +205,70 @@ async function evaluateCompleteness(applicationId: string): Promise<Completeness
   return { complete: checks.every((c) => c.passed), checks };
 }
 
-async function applyStatusTransition(
+type InstrumentRow = NonNullable<Awaited<ReturnType<Orm["Instrument"]["first"]>>>;
+
+/** Applies an approved relocation: records the location history and updates the instrument. */
+async function applyRelocation(
+  orm: Orm,
   application: ApplicationRow,
+  instrument: InstrumentRow,
+  now: string,
+): Promise<void> {
+  const requested = (application.requestedChanges ?? {}) as Record<string, unknown>;
+  const address = typeof requested.address === "string" ? requested.address : "";
+  const administrativeUnitId =
+    typeof requested.administrativeUnitId === "string" ? requested.administrativeUnitId : "";
+  if (!address || !administrativeUnitId) {
+    validation("requestedChanges", "Relocation requires a new address and location unit");
+  }
+
+  const unit = await orm.AdministrativeUnit.first({ id: administrativeUnitId });
+  if (!unit) notFound(administrativeUnitId);
+
+  const postalCode = typeof requested.postalCode === "string" ? requested.postalCode : null;
+  const latitude = typeof requested.latitude === "string" ? requested.latitude : null;
+  const longitude = typeof requested.longitude === "string" ? requested.longitude : null;
+
+  // Close the current open location period and snapshot the old location.
+  const previousOpen = await orm.InstrumentLocationHistory.where({
+    instrumentId: instrument.id,
+    effectiveUntil: null,
+  }).first();
+  if (previousOpen) {
+    await orm.InstrumentLocationHistory.where({ id: previousOpen.id }).update({ effectiveUntil: now });
+  }
+  await orm.InstrumentLocationHistory.create({
+    instrumentId: instrument.id,
+    applicationId: null,
+    address: instrument.address,
+    administrativeUnitId: instrument.administrativeUnitId,
+    postalCode: instrument.postalCode,
+    latitude: instrument.latitude,
+    longitude: instrument.longitude,
+    effectiveFrom: previousOpen?.effectiveFrom ?? instrument.createdAt,
+    effectiveUntil: now,
+  });
+  await orm.InstrumentLocationHistory.create({
+    instrumentId: instrument.id,
+    applicationId: application.id,
+    address,
+    administrativeUnitId,
+    postalCode,
+    latitude,
+    longitude,
+    effectiveFrom: now,
+    effectiveUntil: null,
+  });
+  await orm.Instrument.where({ id: instrument.id }).update({
+    address,
+    administrativeUnitId,
+    postalCode,
+    latitude,
+    longitude,
+  });
+}
+
+async function applyStatusTransition(  application: ApplicationRow,
   to: ApplicationStatus,
   changedById: string,
   reason: string | null,
@@ -295,6 +378,70 @@ export const applicationsService = {
     return evaluateCompleteness(input.id);
   },
 
+  async detail(input: GetApplicationInput, user: AppUser): Promise<ApplicationDetailOutput> {
+    const application = await db.orm.public.Application.first({ id: input.id });
+    if (!application) notFound(input.id);
+    await assertCanView(user, application);
+
+    const instrument = await loadInstrumentFor(application);
+    const [output, statusHistory, completeness, type, unit, business, workOrder, certificates] = await Promise.all([
+      this.fetchOutput(input.id),
+      db.orm.public.ApplicationStatusHistory.where({ applicationId: input.id })
+        .orderBy((h) => h.createdAt.asc())
+        .all(),
+      evaluateCompleteness(input.id),
+      db.orm.public.InstrumentType.first({ id: instrument.instrumentTypeId }),
+      db.orm.public.AdministrativeUnit.first({ id: instrument.administrativeUnitId }),
+      db.orm.public.Business.first({ id: instrument.businessId }),
+      db.orm.public.WorkOrder.where({ applicationId: input.id }).first(),
+      db.orm.public.Certificate.where({ instrumentId: instrument.id })
+        .orderBy((c) => c.verifiedAt.desc())
+        .all(),
+    ]);
+
+    return {
+      application: output,
+      instrument: {
+        id: instrument.id,
+        instrumentCode: instrument.instrumentCode,
+        instrumentTypeName: type?.name ?? "",
+        instrumentTypeUnit: type?.unit ?? "",
+        manufacturer: instrument.manufacturer,
+        model: instrument.model,
+        serialNumber: instrument.serialNumber,
+        capacity: instrument.capacity,
+        accuracyClass: instrument.accuracyClass,
+        status: instrument.status,
+        address: instrument.address,
+        administrativeUnitName: unit?.name ?? "",
+      },
+      businessName: business?.businessName ?? "",
+      contactPhone: business?.contactPhone ?? null,
+      contactEmail: business?.contactEmail ?? null,
+      appointment: {
+        scheduledStartAt: workOrder?.scheduledStartAt ?? null,
+        scheduledEndAt: workOrder?.scheduledEndAt ?? null,
+        location: workOrder?.location ?? null,
+      },
+      priorCertificates: certificates.map((c) => ({
+        id: c.id,
+        certificateCode: c.certificateCode,
+        verifiedAt: c.verifiedAt,
+        validUntil: c.validUntil,
+        status: c.status,
+      })),
+      statusHistory: statusHistory.map((h) => ({
+        id: h.id,
+        fromStatus: h.fromStatus,
+        toStatus: h.toStatus,
+        reason: h.reason,
+        changedById: h.changedById,
+        createdAt: h.createdAt,
+      })),
+      completeness,
+    };
+  },
+
   async createDraft(input: CreateDraftApplicationInput, user: AppUser): Promise<ApplicationOutput> {
     if (!user.businessId) validation("businessId", "Create a business profile before applying");
 
@@ -399,6 +546,13 @@ export const applicationsService = {
       }
     });
 
+    await notifyAdminsForUnit(db.orm.public, instrument.administrativeUnitId, {
+      event: "APPLICATION_SUBMITTED",
+      title: "New verification application",
+      message: `Application ${application.applicationCode} for ${instrument.instrumentCode} was submitted for review.`,
+      extra: { applicationId: application.id },
+    });
+
     return this.fetchOutput(input.id);
   },
 
@@ -438,7 +592,33 @@ export const applicationsService = {
     await assertAdminScope(user, application);
     assertTransition(application.status, "APPROVED", "ADMIN");
 
-    await applyStatusTransition(application, "APPROVED", user.id, input.notes ?? null);
+    const isRelocation = application.type === "RELOCATION_RE_VERIFICATION";
+    const instrument = await loadInstrumentFor(application);
+
+    await db.transaction(async (tx) => {
+      await applicationsRepository.update(application.id, { status: "APPROVED" }, tx.orm);
+      await applicationsRepository.createStatusHistory(
+        {
+          applicationId: application.id,
+          fromStatus: application.status,
+          toStatus: "APPROVED",
+          changedById: user.id,
+          reason: input.notes ?? null,
+        },
+        tx.orm,
+      );
+      if (isRelocation) {
+        await applyRelocation(tx.orm.public, application, instrument, new Date().toISOString());
+      }
+    });
+
+    await notifyBusinessOwner(db.orm.public, instrument.businessId, {
+      event: "APPLICATION_APPROVED",
+      title: "Application approved",
+      message: `Your application ${application.applicationCode} for ${instrument.instrumentCode} was approved and is awaiting scheduling.`,
+      extra: { applicationId: application.id },
+    });
+
     return this.fetchOutput(input.id);
   },
 

@@ -151,3 +151,22 @@ export const SetAdminScopesOutputSchema = z.object({
   administrativeUnitIds: z.array(z.string()),
 });
 export type SetAdminScopesOutput = z.infer<typeof SetAdminScopesOutputSchema>;
+
+export const AdminAccountOutputSchema = z.object({
+  userId: z.string(),
+  email: z.string(),
+  fullName: z.string(),
+  isActive: z.boolean(),
+  roles: z.array(AdminRoleSchema),
+  scopeAdministrativeUnitIds: z.array(z.string()),
+});
+export type AdminAccountOutput = z.infer<typeof AdminAccountOutputSchema>;
+
+export const ListAdminsInputSchema = PaginationInputSchema;
+export type ListAdminsInput = z.infer<typeof ListAdminsInputSchema>;
+
+export const ListAdminsOutputSchema = z.object({
+  items: z.array(AdminAccountOutputSchema),
+  pagination: PaginationMetaSchema,
+});
+export type ListAdminsOutput = z.infer<typeof ListAdminsOutputSchema>;

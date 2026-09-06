@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { PaginationInputSchema, PaginationMetaSchema } from "@/schemas/shared";
+import { IdParamSchema, PaginationInputSchema, PaginationMetaSchema } from "@/schemas/shared";
+
+export const DeletedOutputSchema = z.object({ id: z.string() });
+export type DeletedOutput = z.infer<typeof DeletedOutputSchema>;
 
 // ---------------------------------------------------------------------------
 // Administrative units (State -> District -> Tehsil -> Village)
@@ -39,6 +42,16 @@ export const CreateAdministrativeUnitInputSchema = z.object({
 });
 export type CreateAdministrativeUnitInput = z.infer<typeof CreateAdministrativeUnitInputSchema>;
 
+export const UpdateAdministrativeUnitInputSchema = z.object({
+  id: z.string().min(1, "ID is required"),
+  name: z.string().min(1, "Name is required").optional(),
+  latitude: z.string().optional(),
+  longitude: z.string().optional(),
+});
+export type UpdateAdministrativeUnitInput = z.infer<typeof UpdateAdministrativeUnitInputSchema>;
+
+export const DeleteAdministrativeUnitInputSchema = IdParamSchema;
+
 // ---------------------------------------------------------------------------
 // Instrument types (controlled master categories)
 // ---------------------------------------------------------------------------
@@ -66,6 +79,16 @@ export const CreateInstrumentTypeInputSchema = z.object({
   unit: z.string().min(1, "Unit is required"),
 });
 export type CreateInstrumentTypeInput = z.infer<typeof CreateInstrumentTypeInputSchema>;
+
+export const UpdateInstrumentTypeInputSchema = z.object({
+  id: z.string().min(1, "ID is required"),
+  code: z.string().min(1, "Code is required").optional(),
+  name: z.string().min(1, "Name is required").optional(),
+  unit: z.string().min(1, "Unit is required").optional(),
+});
+export type UpdateInstrumentTypeInput = z.infer<typeof UpdateInstrumentTypeInputSchema>;
+
+export const DeleteInstrumentTypeInputSchema = IdParamSchema;
 
 // ---------------------------------------------------------------------------
 // Regulatory rules (versioned by effective window; decimals are strings)
@@ -107,6 +130,20 @@ export const CreateRegulatoryRuleInputSchema = z.object({
   effectiveUntil: z.string().datetime().optional(),
 });
 export type CreateRegulatoryRuleInput = z.infer<typeof CreateRegulatoryRuleInputSchema>;
+
+export const UpdateRegulatoryRuleInputSchema = z.object({
+  id: z.string().min(1, "ID is required"),
+  accuracyClass: z.string().min(1).optional(),
+  capacityMin: z.string().min(1).optional(),
+  capacityMax: z.string().min(1).optional(),
+  permissibleError: z.string().min(1).optional(),
+  verificationPeriodMonths: z.number().int().positive().optional(),
+  effectiveFrom: z.string().datetime().optional(),
+  effectiveUntil: z.string().datetime().optional(),
+});
+export type UpdateRegulatoryRuleInput = z.infer<typeof UpdateRegulatoryRuleInputSchema>;
+
+export const DeleteRegulatoryRuleInputSchema = IdParamSchema;
 
 // ---------------------------------------------------------------------------
 // Inspection templates (versioned, with ordered items)
@@ -176,3 +213,14 @@ export const CreateInspectionTemplateInputSchema = z.object({
   items: z.array(CreateInspectionTemplateItemInputSchema).min(1, "At least one item is required"),
 });
 export type CreateInspectionTemplateInput = z.infer<typeof CreateInspectionTemplateInputSchema>;
+
+export const UpdateInspectionTemplateInputSchema = z.object({
+  id: z.string().min(1, "ID is required"),
+  name: z.string().min(1, "Name is required").optional(),
+  effectiveFrom: z.string().datetime().optional(),
+  effectiveUntil: z.string().datetime().optional(),
+  isActive: z.boolean().optional(),
+});
+export type UpdateInspectionTemplateInput = z.infer<typeof UpdateInspectionTemplateInputSchema>;
+
+export const DeleteInspectionTemplateInputSchema = IdParamSchema;

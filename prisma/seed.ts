@@ -1,7 +1,7 @@
 import 'dotenv/config';
-import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import { db } from './db';
+import { buildCanonicalPayload, hashPayload } from '../modules/certificates/server/payload';
 
 const orm = db.orm.public;
 
@@ -256,7 +256,7 @@ export async function main() {
     },
   ];
 
-  const seededRules = [];
+  const seededRules: NonNullable<Awaited<ReturnType<typeof orm.RegulatoryRule["first"]>>>[] = [];
   for (const r of rules) {
     let rule = await orm.RegulatoryRule
       .where({ instrumentTypeId: r.typeId, accuracyClass: r.accuracyClass })
@@ -622,7 +622,7 @@ export async function main() {
     { bIdx: 4, code: 'DMI-EWB-020', typeId: ewbType.id, mfr: 'Tulsi Scales', model: 'TableTop 30', serial: 'TLS-2024-301', cap: '30.0', cls: 'Class III', stat: 'REGISTERED' as const },
   ];
 
-  const seededInstruments = [];
+  const seededInstruments: NonNullable<Awaited<ReturnType<typeof orm.Instrument["first"]>>>[] = [];
   for (const s of instrumentSpecs) {
     const ownerObj = seededBusinesses[s.bIdx];
     let inst = await orm.Instrument.where({ instrumentCode: s.code }).first();
@@ -647,10 +647,22 @@ export async function main() {
   }
 
   // 10. Applications, Work Orders, Inspections, & Certificates
-  console.log('📝 Seeding 15 Applications, Work Orders, Inspections, and 10 Certificates...');
+  console.log('📝 Seeding 18 Applications, Work Orders, Inspections, and 10 Certificates...');
   // Scale requirements:
-  // - Exactly 15 Applications
+  // - 18 Applications (15 lifecycle stages + 3 active-certificate applications)
   // - Exactly 10 Certificates (3 Expired, 4 Expiring Soon, 3 Active)
+
+  const typeNameById = new Map([ewbType, fdpType, wbrType, astType, pwbType].map((t) => [t.id, t.name]));
+
+  // Per-type rule/template lookup for seeded inspections and certificates.
+  const ruleFor = (inst: (typeof seededInstruments)[number]) =>
+    seededRules.find((r) => r.instrumentTypeId === inst.instrumentTypeId && r.accuracyClass === inst.accuracyClass) ?? null;
+  const templateFor = (inst: (typeof seededInstruments)[number]) =>
+    inst.instrumentTypeId === fdpType.id ? fdpTemplate : ewbTemplate;
+  const ISSUING_AUTHORITY = 'Legal Metrology Department, Maharashtra';
+
+  const gatcOperatorMembership = await orm.GatcMembership.where({ gatcId: seededGatcs[0].id, role: 'OPERATOR' }).first();
+  const gatcOperatorUserId = gatcOperatorMembership?.userId ?? sysAdmin.id;
 
   const appConfigs = [
     // 0: Draft
@@ -775,14 +787,14 @@ export async function main() {
           applicationId: app.id,
           lmoId: isLmo ? seededLmos[0].lmo.id : null,
           gatcId: !isLmo ? seededGatcs[0].id : null,
-          performedById: isLmo ? seededLmos[0].user.id : sysAdmin.id,
+          performedById: isLmo ? seededLmos[0].user.id : gatcOperatorUserId,
           startedAt: '2026-08-10T09:30:00.000Z',
           submittedAt: cfg.status !== 'VERIFICATION_IN_PROGRESS' ? '2026-08-10T11:00:00.000Z' : null,
           finalizedAt: cfg.status !== 'VERIFICATION_IN_PROGRESS' ? '2026-08-10T11:30:00.000Z' : null,
-          finalizedById: cfg.status !== 'VERIFICATION_IN_PROGRESS' ? (isLmo ? seededLmos[0].user.id : sysAdmin.id) : null,
+          finalizedById: cfg.status !== 'VERIFICATION_IN_PROGRESS' ? (isLmo ? seededLmos[0].user.id : gatcOperatorUserId) : null,
           result: isPass ? 'PASS' : (isFail ? 'FAIL' : null),
-          templateId: ewbTemplate.id,
-          ruleVersionId: seededRules[0].id,
+          templateId: templateFor(inst).id,
+          ruleVersionId: ruleFor(inst)?.id ?? null,
           notes: isFail ? 'Exceeded permissible tolerance limit on load test.' : 'All tests within permissible limits.',
         });
 
@@ -806,20 +818,31 @@ export async function main() {
     if (cfg.cert) {
       let cert = await orm.Certificate.where({ certificateCode: cfg.cert.code }).first();
       if (!cert) {
-        const payloadHash = crypto.createHash('sha256')
-          .update(JSON.stringify({
-            code: cfg.cert.code,
-            appCode: cfg.appCode,
-            instrumentCode: inst.instrumentCode,
-            validUntil: cfg.cert.validUntil,
-          }))
-          .digest('hex');
+        const rule = ruleFor(inst);
+        const businessName = seededBusinesses.find((b) => b.business.id === inst.businessId)?.business.businessName ?? '';
+        const payloadHash = hashPayload(buildCanonicalPayload({
+          certificateCode: cfg.cert.code,
+          applicationCode: cfg.appCode,
+          instrumentCode: inst.instrumentCode,
+          manufacturer: inst.manufacturer,
+          model: inst.model,
+          serialNumber: inst.serialNumber,
+          instrumentTypeName: typeNameById.get(inst.instrumentTypeId) ?? '',
+          capacity: inst.capacity,
+          accuracyClass: inst.accuracyClass,
+          businessName,
+          result: 'PASS',
+          ruleReference: rule?.id ?? '',
+          verifiedAt: cfg.cert.verifiedAt,
+          validUntil: cfg.cert.validUntil,
+          issuingAuthority: ISSUING_AUTHORITY,
+        }));
 
         cert = await orm.Certificate.create({
           certificateCode: cfg.cert.code,
           applicationId: app.id,
           instrumentId: inst.id,
-          ruleVersionId: seededRules[0].id,
+          ruleVersionId: rule?.id ?? null,
           payloadHash,
           verifiedAt: cfg.cert.verifiedAt,
           validUntil: cfg.cert.validUntil,
@@ -872,7 +895,7 @@ export async function main() {
       entityType: 'System',
       entityId: 'SYSTEM',
       newState: {
-        description: 'SIH demo dataset initialized successfully with 5 businesses, 20 instruments, 15 applications, 6 LMOs, 3 GATCs, 10 certificates.',
+        description: 'SIH demo dataset initialized successfully with 5 businesses, 20 instruments, 18 applications, 6 LMOs, 3 GATCs, 10 certificates.',
       },
       ipAddress: '127.0.0.1',
     });
@@ -882,7 +905,7 @@ export async function main() {
   console.log('📊 Summary:');
   console.log(`- 5 Businesses: ${seededBusinesses.map(b => b.business.businessName).join(', ')}`);
   console.log(`- 20 Instruments created`);
-  console.log(`- 15 Applications created across all lifecycle stages`);
+  console.log(`- 18 Applications created across all lifecycle stages`);
   console.log(`- 6 LMOs provisioned with jurisdictions and category expertise`);
   console.log(`- 3 GATCs provisioned with staff, service areas, and authorizations`);
   console.log(`- 10 Certificates (3 Expired, 4 Expiring Soon, 3 Active)`);

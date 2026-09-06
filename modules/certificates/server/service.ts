@@ -3,6 +3,7 @@ import { ORPCError } from "@orpc/server";
 import { db } from "@/prisma/db";
 import { paginationMeta } from "@/schemas/shared";
 import { requireStateScope } from "@/middleware/require-state-scope";
+import { adminInstrumentIds } from "@/lib/scope";
 import type { AppUser } from "@/middleware/context";
 import type { UserRole } from "@/modules/auth/schema";
 import { buildCanonicalPayload, hashPayload } from "./payload";
@@ -131,9 +132,36 @@ async function toOutputs(rows: CertificateRow[]): Promise<CertificateOutput[]> {
   });
 }
 
+/** Instrument IDs visible to an admin, or null when unrestricted. */
+// (adminInstrumentIds is shared in @/lib/scope)
+
 async function hasActiveMembership(userId: string, gatcId: string): Promise<boolean> {
   const membership = await db.orm.public.GatcMembership.where({ userId, gatcId, isActive: true }).first();
   return !!membership;
+}
+
+/** Application IDs whose inspection this field user performed or is authorized for. */
+async function fieldApplicationIds(user: AppUser): Promise<Set<string>> {
+  const ids = new Set<string>();
+  (await db.orm.public.Inspection.where({ performedById: user.id }).select("applicationId").all()).forEach((i) =>
+    ids.add(i.applicationId),
+  );
+  if (user.roles.includes("LMO")) {
+    const lmo = await db.orm.public.Lmo.where({ userId: user.id, isActive: true }).first();
+    if (lmo) {
+      (await db.orm.public.Inspection.where({ lmoId: lmo.id }).select("applicationId").all()).forEach((i) =>
+        ids.add(i.applicationId),
+      );
+    }
+  }
+  const memberships = await db.orm.public.GatcMembership.where({ userId: user.id, isActive: true }).all();
+  if (memberships.length > 0) {
+    const gatcIds = memberships.map((m) => m.gatcId);
+    (await db.orm.public.Inspection.where((i) => i.gatcId.in(gatcIds)).select("applicationId").all()).forEach((i) =>
+      ids.add(i.applicationId),
+    );
+  }
+  return ids;
 }
 
 async function assertFieldAuthority(user: AppUser, applicationId: string): Promise<boolean> {
@@ -192,6 +220,47 @@ export const certificatesService = {
     if (instrumentIds.length === 0) return { items: [], pagination: paginationMeta(0, page, limit) };
 
     let query = db.orm.public.Certificate.where((c) => c.instrumentId.in(instrumentIds));
+    if (input.status) query = query.where({ status: input.status });
+    if (input.instrumentId) query = query.where({ instrumentId: input.instrumentId });
+
+    const [rows, totals] = await Promise.all([
+      query.orderBy((c) => c.createdAt.desc()).offset((page - 1) * limit).limit(limit).all(),
+      query.aggregate((agg) => ({ total: agg.count() })),
+    ]);
+
+    return { items: await toOutputs(rows), pagination: paginationMeta(totals.total, page, limit) };
+  },
+
+  async list(input: ListCertificatesInput, user: AppUser): Promise<ListCertificatesOutput> {
+    const page = input.page ?? 1;
+    const limit = input.limit ?? 20;
+
+    const instrumentIds = await adminInstrumentIds(user);
+    if (instrumentIds !== null && instrumentIds.size === 0) {
+      return { items: [], pagination: paginationMeta(0, page, limit) };
+    }
+
+    let query = db.orm.public.Certificate;
+    if (instrumentIds !== null) query = query.where((c) => c.instrumentId.in([...instrumentIds]));
+    if (input.status) query = query.where({ status: input.status });
+    if (input.instrumentId) query = query.where({ instrumentId: input.instrumentId });
+
+    const [rows, totals] = await Promise.all([
+      query.orderBy((c) => c.createdAt.desc()).offset((page - 1) * limit).limit(limit).all(),
+      query.aggregate((agg) => ({ total: agg.count() })),
+    ]);
+
+    return { items: await toOutputs(rows), pagination: paginationMeta(totals.total, page, limit) };
+  },
+
+  async listField(input: ListCertificatesInput, user: AppUser): Promise<ListCertificatesOutput> {
+    const page = input.page ?? 1;
+    const limit = input.limit ?? 20;
+
+    const applicationIds = await fieldApplicationIds(user);
+    if (applicationIds.size === 0) return { items: [], pagination: paginationMeta(0, page, limit) };
+
+    let query = db.orm.public.Certificate.where((c) => c.applicationId.in([...applicationIds]));
     if (input.status) query = query.where({ status: input.status });
     if (input.instrumentId) query = query.where({ instrumentId: input.instrumentId });
 

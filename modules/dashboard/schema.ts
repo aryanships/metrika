@@ -21,6 +21,25 @@ const FieldWorkOrderSchema = z.object({
   status: z.string(),
 });
 
+const SystemStatsSchema = z.object({
+  users: z.number().int(),
+  businesses: z.number().int(),
+  instruments: z.number().int(),
+  applications: z.number().int(),
+  certificates: z.number().int(),
+  auditEvents: z.number().int(),
+  states: z.number().int(),
+  districts: z.number().int(),
+  tehsils: z.number().int(),
+  villages: z.number().int(),
+  instrumentTypes: z.number().int(),
+  regulatoryRules: z.number().int(),
+  inspectionTemplates: z.number().int(),
+  lmos: z.number().int(),
+  gatcs: z.number().int(),
+  admins: z.number().int(),
+});
+
 export const DashboardStatsOutputSchema = z.object({
   role: z.string(),
   owner: z
@@ -48,5 +67,6 @@ export const DashboardStatsOutputSchema = z.object({
       workOrders: z.array(FieldWorkOrderSchema),
     })
     .nullable(),
+  system: SystemStatsSchema.nullable(),
 });
 export type DashboardStatsOutput = z.infer<typeof DashboardStatsOutputSchema>;

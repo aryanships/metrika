@@ -14,6 +14,12 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Non-app reference/planning content:
     "plan/**",
+    // Generated Prisma contract artifacts:
+    "prisma/schema.d.ts",
+    "prisma/schema.json",
+    "migrations/**",
+    // Agent skill/instruction files:
+    ".agents/**",
   ]),
 ]);
 

@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Digital Metrology (e-MetVerify)
 
-## Getting Started
+Online verification system for weighing & measuring instruments — a web platform
+for digitizing the full lifecycle of a measuring instrument: registration →
+verification application → document screening → scheduling → officer/GATC
+assignment → field inspection → pass/fail → prototype digital certificate → QR
+verification → expiry monitoring → re-verification.
 
-First, run the development server:
+Built as a demonstration prototype (SIH internal hackathon). Certificates are
+prototype/demo records, not legally issued government certificates.
+
+## Stack
+
+- **Next.js 16** (App Router) + **React 19** + **TypeScript**
+- **oRPC v2** (contract-first) served inside Next.js at `/rpc`; the same
+  contract is exposed as REST/OpenAPI at `/api`
+- **Prisma 8 (Prisma Next)** data contract + PostgreSQL
+- **shadcn/ui** (Base UI + Tailwind v4), **React Hook Form** + **Zod**,
+  **TanStack Query**
+- Object storage: Cloudflare **R2** (production) or a local filesystem adapter
+  (development)
+
+## Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+bun install
+cp .env.example .env      # fill in DATABASE_URL + AUTH_SECRET (R2 optional)
+bun run contract:emit     # emit the Prisma data contract
+bun prisma db update      # apply the schema to PostgreSQL
+bun run db:seed           # idempotent demo data
+bun run dev               # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Required env vars: `DATABASE_URL`, `AUTH_SECRET`. R2 vars are optional in
+development — uploads fall back to the local filesystem adapter
+(`STORAGE_DRIVER=local`, served via `/uploads`) when they are unset.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Roles
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Role | Home route | Notes |
+| --- | --- | --- |
+| Instrument Owner / Business | `/owner` | self-registers, registers instruments, applies, tracks certificates |
+| LMO | `/field` | conducts field verification |
+| GATC manager / operator | `/field` | centre-scoped authority (no global role) |
+| State / District Admin | `/admin` | reviews, assigns, schedules, issues |
+| System Admin | `/system` | master data + platform admin |
+| Public | `/verify` | certificate search / QR verification |
 
-## Learn More
+## Demo credentials
 
-To learn more about Next.js, take a look at the following resources:
+All demo accounts use password **`Demo1234!`** (see `docs/demo-runbook.md` for
+the full list).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Role | Email |
+| --- | --- |
+| Instrument owner | `owner.reliance@retail.in` |
+| State admin | `stateadmin.mh@metrika.gov.in` |
+| System admin | `admin@metrika.gov.in` |
+| LMO | `lmo.sharma@metrika.gov.in` |
+| GATC manager | `manager.apex@gatc.org` |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Verification
 
-## Deploy on Vercel
+```bash
+bun x tsc --noEmit    # typecheck
+bun run lint          # eslint (zero errors)
+bun run scripts/lifecycle-e2e.ts        # owner → certificate → re-verification
+bun run scripts/applications-selfcheck.ts
+bun run scripts/certificates-selfcheck.ts
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See `docs/demo-runbook.md` for the end-to-end demo flow and
+`docs/demo-scope.md` for the prototype boundaries.

@@ -1,5 +1,6 @@
 import { ORPCError } from "@orpc/server";
 import { db } from "@/prisma/db";
+import { buildCanonicalPayload, hashPayload } from "@/modules/certificates/server/payload";
 import type { VerifyCertificateInput, PublicVerificationOutput } from "../schema";
 
 type Orm = typeof db.orm.public;
@@ -46,6 +47,36 @@ export const verificationService = {
     const active = certificate.status === "ACTIVE" || certificate.status === "EXPIRING_SOON";
     const valid = active && Date.parse(certificate.validUntil) > now;
 
+    // Recompute the canonical payload hash from live fields to detect tampering
+    // (best-effort prototype integrity, not a qualified signature).
+    const [application, business, rule] = await Promise.all([
+      db.orm.public.Application.first({ id: certificate.applicationId }),
+      instrument ? db.orm.public.Business.first({ id: instrument.businessId }) : Promise.resolve(null),
+      certificate.ruleVersionId
+        ? db.orm.public.RegulatoryRule.first({ id: certificate.ruleVersionId })
+        : Promise.resolve(null),
+    ]);
+    const recomputedHash = hashPayload(
+      buildCanonicalPayload({
+        certificateCode: certificate.certificateCode,
+        applicationCode: application?.applicationCode ?? "",
+        instrumentCode: instrument?.instrumentCode ?? "",
+        manufacturer: instrument?.manufacturer ?? "",
+        model: instrument?.model ?? "",
+        serialNumber: instrument?.serialNumber ?? "",
+        instrumentTypeName: type?.name ?? "",
+        capacity: instrument?.capacity ?? null,
+        accuracyClass: instrument?.accuracyClass ?? null,
+        businessName: business?.businessName ?? "",
+        result: "PASS",
+        ruleReference: rule?.id ?? "",
+        verifiedAt: certificate.verifiedAt,
+        validUntil: certificate.validUntil,
+        issuingAuthority,
+      }),
+    );
+    const tamperDetected = recomputedHash !== certificate.payloadHash;
+
     await db.orm.public.CertificateVerification.create({
       certificateId: certificate.id,
       ipAddress: ipAddress ?? null,
@@ -71,8 +102,8 @@ export const verificationService = {
         capacityUnit: type?.unit ?? null,
       },
       integrity: {
-        isHashVerified: true,
-        tamperDetected: false,
+        isHashVerified: !tamperDetected,
+        tamperDetected,
       },
       verificationTimestamp: new Date().toISOString(),
     };

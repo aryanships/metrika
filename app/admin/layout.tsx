@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createInitialContext } from "@/middleware/context";
-import { RoleNav } from "@/components/role-nav";
+import { AppShell } from "@/components/app-shell";
 
 const ADMIN_ROLES = ["STATE_ADMIN", "DISTRICT_ADMIN", "SYSTEM_ADMIN", "DEPARTMENT_OFFICIAL"] as const;
 
@@ -14,13 +14,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const links = [
     { href: "/admin", label: "Dashboard" },
+    { href: "/admin/applications", label: "Applications" },
+    { href: "/admin/lmos", label: "LMOs" },
+    { href: "/admin/gatcs", label: "GATCs" },
+    { href: "/admin/certificates", label: "Certificates" },
     { href: "/admin/audit", label: "Audit log" },
   ];
 
   return (
-    <div className="min-h-full">
-      <RoleNav name={user.fullName} email={user.email} links={links} />
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
-    </div>
+    <AppShell user={user} links={links}>
+      {children}
+    </AppShell>
   );
 }

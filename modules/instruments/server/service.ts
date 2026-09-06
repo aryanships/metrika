@@ -2,9 +2,13 @@ import { randomBytes } from "node:crypto";
 import { ORPCError } from "@orpc/server";
 import { db } from "@/prisma/db";
 import { paginationMeta } from "@/schemas/shared";
+import { adminInstrumentIds } from "@/lib/scope";
+import type { AppUser } from "@/middleware/context";
 import {
   CreateInstrumentInput,
   GetInstrumentInput,
+  IdentifyInstrumentInput,
+  IdentifyInstrumentOutput,
   InstrumentOutput,
   InstrumentPassportOutput,
   ListInstrumentsInput,
@@ -120,10 +124,61 @@ export const instrumentsService = {
     return { items, pagination: paginationMeta(totals.total, page, limit) };
   },
 
+  async listForAdmin(input: ListInstrumentsInput, user: AppUser): Promise<ListInstrumentsOutput> {
+    const page = input.page ?? 1;
+    const limit = input.limit ?? 20;
+
+    const instrumentIds = await adminInstrumentIds(user);
+    if (instrumentIds !== null && instrumentIds.size === 0) {
+      return { items: [], pagination: paginationMeta(0, page, limit) };
+    }
+
+    let query = db.orm.public.Instrument;
+    if (instrumentIds !== null) query = query.where((i) => i.id.in([...instrumentIds]));
+    if (input.status) query = query.where({ status: input.status });
+
+    const [rows, totals] = await Promise.all([
+      query.orderBy((i) => i.createdAt.desc()).offset((page - 1) * limit).limit(limit).all(),
+      query.aggregate((agg) => ({ total: agg.count() })),
+    ]);
+
+    const typeIds = [...new Set(rows.map((r) => r.instrumentTypeId))];
+    const unitIds = [...new Set(rows.map((r) => r.administrativeUnitId))];
+    const [types, units] = await Promise.all([
+      db.orm.public.InstrumentType.where((t) => t.id.in(typeIds)).all(),
+      db.orm.public.AdministrativeUnit.where((u) => u.id.in(unitIds)).all(),
+    ]);
+    const typeById = new Map(types.map((t) => [t.id, t]));
+    const unitById = new Map(units.map((u) => [u.id, u]));
+
+    const items = rows.map((row) => toOutput(row, typeById.get(row.instrumentTypeId) ?? null, unitById.get(row.administrativeUnitId) ?? null));
+
+    return { items, pagination: paginationMeta(totals.total, page, limit) };
+  },
+
   async get(input: GetInstrumentInput): Promise<InstrumentOutput> {
     const row = await db.orm.public.Instrument.first({ id: input.id });
     if (!row) notFound(input.id);
     return toEnrichedOutput(db.orm.public, row);
+  },
+
+  async identify(input: IdentifyInstrumentInput): Promise<IdentifyInstrumentOutput> {
+    const row = await db.orm.public.Instrument.where({ instrumentCode: input.code }).first();
+    if (!row) notFound(input.code);
+
+    const [type, latestApplication] = await Promise.all([
+      db.orm.public.InstrumentType.first({ id: row.instrumentTypeId }),
+      db.orm.public.Application.where({ instrumentId: row.id }).orderBy((a) => a.createdAt.desc()).first(),
+    ]);
+
+    return {
+      id: row.id,
+      instrumentCode: row.instrumentCode,
+      serialNumber: row.serialNumber,
+      status: row.status,
+      instrumentTypeName: type?.name ?? "",
+      latestApplicationId: latestApplication?.id ?? null,
+    };
   },
 
   async create(input: CreateInstrumentInput, businessId: string | null): Promise<InstrumentOutput> {
@@ -173,21 +228,11 @@ export const instrumentsService = {
     const row = await db.orm.public.Instrument.first({ id: input.id });
     if (!row) notFound(input.id);
 
-    if (input.administrativeUnitId && input.administrativeUnitId !== row.administrativeUnitId) {
-      const unit = await db.orm.public.AdministrativeUnit.first({ id: input.administrativeUnitId });
-      if (!unit) notFound(input.administrativeUnitId);
-    }
-
     await db.orm.public.Instrument.where({ id: input.id }).update({
       capacity: input.capacity,
       accuracyClass: input.accuracyClass,
       yearOfManufacture: input.yearOfManufacture,
       purchaseDate: input.purchaseDate,
-      address: input.address,
-      administrativeUnitId: input.administrativeUnitId,
-      postalCode: input.postalCode,
-      latitude: input.latitude,
-      longitude: input.longitude,
     });
 
     return this.get({ id: input.id });

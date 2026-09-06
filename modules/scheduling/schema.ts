@@ -66,6 +66,7 @@ export type WorkOrderOutput = z.infer<typeof WorkOrderOutputSchema>;
 
 export const ListWorkOrdersInputSchema = PaginationInputSchema.extend({
   route: RouteTypeSchema.optional(),
+  applicationId: z.string().optional(),
 });
 export type ListWorkOrdersInput = z.infer<typeof ListWorkOrdersInputSchema>;
 

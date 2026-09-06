@@ -44,8 +44,8 @@ async function main(): Promise<void> {
   if (!business) throw new Error("Missing Reliance Fresh business");
   ownerA.businessId = business.id;
 
-  const instrument = await db.orm.public.Instrument.where({ businessId: business.id }).first();
-  if (!instrument) throw new Error("Missing Reliance Fresh instrument");
+  const instrument = await db.orm.public.Instrument.where({ businessId: business.id, instrumentCode: "DMI-EWB-001" }).first();
+  if (!instrument) throw new Error("Missing Reliance Fresh instrument DMI-EWB-001");
 
   const stateAdmin = await loadUser("stateadmin.mh@metrika.gov.in", ["STATE_ADMIN"]);
   const mumbaiAdmin = await loadUser("distadmin.mumbai@metrika.gov.in", ["DISTRICT_ADMIN"]);

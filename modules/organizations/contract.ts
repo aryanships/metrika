@@ -14,6 +14,8 @@ import {
   ProvisionAdminOutputSchema,
   SetAdminScopesInputSchema,
   SetAdminScopesOutputSchema,
+  ListAdminsInputSchema,
+  ListAdminsOutputSchema,
 } from "./schema";
 
 export const listLmosContract = base
@@ -46,6 +48,11 @@ export const provisionAdminContract = base
   .input(ProvisionAdminInputSchema)
   .output(ProvisionAdminOutputSchema);
 
+export const listAdminsContract = base
+  .route({ method: "GET", path: "/organizations/admins", summary: "List admin accounts", tags: ["Organizations"] })
+  .input(ListAdminsInputSchema)
+  .output(ListAdminsOutputSchema);
+
 export const setAdminScopesContract = base
   .route({ method: "PUT", path: "/organizations/admins/scopes", summary: "Set admin scopes", tags: ["Organizations"] })
   .input(SetAdminScopesInputSchema)
@@ -58,5 +65,6 @@ export const organizationsContract = {
   createGatc: createGatcContract,
   inviteGatcStaff: inviteGatcStaffContract,
   provisionAdmin: provisionAdminContract,
+  listAdmins: listAdminsContract,
   setAdminScopes: setAdminScopesContract,
 };

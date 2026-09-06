@@ -21,6 +21,22 @@ export const mastersRouter = implementer.router({
     },
   ),
 
+  updateAdministrativeUnit: implementer.updateAdministrativeUnit.use(requireRole("SYSTEM_ADMIN")).handler(
+    async ({ input, context }) => {
+      const updated = await mastersService.updateAdministrativeUnit(input);
+      await auditAction(context, "ADMIN_UNIT_UPDATED", "AdministrativeUnit", updated.id, updated);
+      return updated;
+    },
+  ),
+
+  deleteAdministrativeUnit: implementer.deleteAdministrativeUnit.use(requireRole("SYSTEM_ADMIN")).handler(
+    async ({ input, context }) => {
+      const result = await mastersService.deleteAdministrativeUnit(input);
+      await auditAction(context, "ADMIN_UNIT_DELETED", "AdministrativeUnit", result.id);
+      return result;
+    },
+  ),
+
   listInstrumentTypes: implementer.listInstrumentTypes.use(requireAuth).handler(async ({ input }) => {
     return mastersService.listInstrumentTypes(input);
   }),
@@ -30,6 +46,22 @@ export const mastersRouter = implementer.router({
       const created = await mastersService.createInstrumentType(input);
       await auditAction(context, "INSTRUMENT_TYPE_CREATED", "InstrumentType", created.id, created);
       return created;
+    },
+  ),
+
+  updateInstrumentType: implementer.updateInstrumentType.use(requireRole("SYSTEM_ADMIN")).handler(
+    async ({ input, context }) => {
+      const updated = await mastersService.updateInstrumentType(input);
+      await auditAction(context, "INSTRUMENT_TYPE_UPDATED", "InstrumentType", updated.id, updated);
+      return updated;
+    },
+  ),
+
+  deleteInstrumentType: implementer.deleteInstrumentType.use(requireRole("SYSTEM_ADMIN")).handler(
+    async ({ input, context }) => {
+      const result = await mastersService.deleteInstrumentType(input);
+      await auditAction(context, "INSTRUMENT_TYPE_DELETED", "InstrumentType", result.id);
+      return result;
     },
   ),
 
@@ -45,6 +77,22 @@ export const mastersRouter = implementer.router({
     },
   ),
 
+  updateRegulatoryRule: implementer.updateRegulatoryRule.use(requireRole("SYSTEM_ADMIN")).handler(
+    async ({ input, context }) => {
+      const updated = await mastersService.updateRegulatoryRule(input);
+      await auditAction(context, "REGULATORY_RULE_UPDATED", "RegulatoryRule", updated.id, updated);
+      return updated;
+    },
+  ),
+
+  deleteRegulatoryRule: implementer.deleteRegulatoryRule.use(requireRole("SYSTEM_ADMIN")).handler(
+    async ({ input, context }) => {
+      const result = await mastersService.deleteRegulatoryRule(input);
+      await auditAction(context, "REGULATORY_RULE_DELETED", "RegulatoryRule", result.id);
+      return result;
+    },
+  ),
+
   listInspectionTemplates: implementer.listInspectionTemplates.use(requireAuth).handler(async ({ input }) => {
     return mastersService.listInspectionTemplates(input);
   }),
@@ -54,6 +102,22 @@ export const mastersRouter = implementer.router({
       const created = await mastersService.createInspectionTemplate(input);
       await auditAction(context, "INSPECTION_TEMPLATE_CREATED", "InspectionTemplate", created.id, created);
       return created;
+    },
+  ),
+
+  updateInspectionTemplate: implementer.updateInspectionTemplate.use(requireRole("SYSTEM_ADMIN")).handler(
+    async ({ input, context }) => {
+      const updated = await mastersService.updateInspectionTemplate(input);
+      await auditAction(context, "INSPECTION_TEMPLATE_UPDATED", "InspectionTemplate", updated.id, updated);
+      return updated;
+    },
+  ),
+
+  deleteInspectionTemplate: implementer.deleteInspectionTemplate.use(requireRole("SYSTEM_ADMIN")).handler(
+    async ({ input, context }) => {
+      const result = await mastersService.deleteInspectionTemplate(input);
+      await auditAction(context, "INSPECTION_TEMPLATE_DELETED", "InspectionTemplate", result.id);
+      return result;
     },
   ),
 });

@@ -5786,6 +5786,13 @@
                   "kind": "scalar"
                 }
               },
+              "recommendation": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/json@1",
+                  "kind": "scalar"
+                }
+              },
               "recommendedScore": {
                 "nullable": true,
                 "type": {
@@ -5922,6 +5929,9 @@
                 },
                 "location": {
                   "column": "location"
+                },
+                "recommendation": {
+                  "column": "recommendation"
                 },
                 "recommendedScore": {
                   "column": "recommendedScore"
@@ -10200,6 +10210,11 @@
                   "nativeType": "text",
                   "nullable": true
                 },
+                "recommendation": {
+                  "codecId": "pg/json@1",
+                  "nativeType": "json",
+                  "nullable": true
+                },
                 "recommendedScore": {
                   "codecId": "pg/numeric@1",
                   "nativeType": "numeric",
@@ -10534,7 +10549,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "b75537e9f28530374740e28e3ec66d6c587852954dc98f8e34ac700d457b723c"
+    "storageHash": "d0fac5bad90945ab55c17e82d2d6f7ec3cf12fe39a3469488740e4fb6119cd74"
   },
   "execution": {
     "executionHash": "f18347476a82879caed5e364b33b5338dcb6f43a433d37b1c99d9c994a25f519",

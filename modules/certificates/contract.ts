@@ -19,6 +19,28 @@ export const listMineCertificatesContract = base
   .input(ListCertificatesInputSchema)
   .output(ListCertificatesOutputSchema);
 
+export const listCertificatesContract = base
+  .route({
+    method: "GET",
+    path: "/certificates",
+    summary: "List certificates (admin)",
+    description: "Lists issued certificates scoped to the admin's jurisdiction.",
+    tags: ["Certificates"],
+  })
+  .input(ListCertificatesInputSchema)
+  .output(ListCertificatesOutputSchema);
+
+export const listFieldCertificatesContract = base
+  .route({
+    method: "GET",
+    path: "/certificates/field",
+    summary: "List field-issued certificates",
+    description: "Lists certificates the authenticated LMO or GATC member issued or helped verify.",
+    tags: ["Certificates"],
+  })
+  .input(ListCertificatesInputSchema)
+  .output(ListCertificatesOutputSchema);
+
 export const getCertificateContract = base
   .route({
     method: "GET",
@@ -55,6 +77,8 @@ export const updateCertificateStatusContract = base
 
 export const certificatesContract = {
   listMine: listMineCertificatesContract,
+  list: listCertificatesContract,
+  listField: listFieldCertificatesContract,
   get: getCertificateContract,
   issue: issueCertificateContract,
   updateStatus: updateCertificateStatusContract,

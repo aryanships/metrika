@@ -36,15 +36,47 @@ export function OwnerDashboardSection() {
   if (statsQuery.isPending) return <p className="text-sm text-muted-foreground">Loading dashboard…</p>;
 
   const owner = statsQuery.data?.owner;
+  const expired = owner?.certificatesByStatus["EXPIRED"] ?? 0;
+  const expiring = owner?.certificatesByStatus["EXPIRING_SOON"] ?? 0;
+  const needsReverification = expired + expiring > 0;
 
   return (
     <div className="flex flex-col gap-8">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Instruments" value={owner ? totalOf(owner.instrumentsByStatus) : 0} href="/owner/instruments" />
-        <StatCard label="Certificates" value={owner ? totalOf(owner.certificatesByStatus) : 0} href="/owner/certificates" />
-        <StatCard label="Applications" value={owner ? totalOf(owner.applicationsByStatus) : 0} />
+        <StatCard label="Instruments" value={owner ? totalOf(owner.instrumentsByStatus) : 0} href="/business/instruments" />
+        <StatCard label="Certificates" value={owner ? totalOf(owner.certificatesByStatus) : 0} href="/business/certificates" />
+        <StatCard label="Applications" value={owner ? totalOf(owner.applicationsByStatus) : 0} href="/business/applications" />
         <StatCard label="Upcoming appointments" value={owner?.upcomingAppointments.length ?? 0} />
       </div>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold">Quick actions</h2>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/business/instruments/new" className="rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors hover:border-ring">
+            Register instrument
+          </Link>
+          <Link href="/business/applications/new" className="rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors hover:border-ring">
+            New application
+          </Link>
+          <Link href="/verify" className="rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors hover:border-ring">
+            Verify a certificate
+          </Link>
+        </div>
+      </section>
+
+      {needsReverification && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
+          <div>
+            <p className="text-sm font-medium">Certificates need attention</p>
+            <p className="text-xs text-muted-foreground">
+              {expiring} expiring soon, {expired} expired. Apply for re-verification to stay compliant.
+            </p>
+          </div>
+          <Link href="/business/applications/new?type=RE_VERIFICATION" className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/80">
+            Apply for re-verification
+          </Link>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="flex flex-col gap-3">
@@ -74,12 +106,6 @@ export function OwnerDashboardSection() {
             ) : (
               <p className="text-sm text-muted-foreground">No certificates yet.</p>
             )}
-          </div>
-
-          <div className="mt-4">
-            <Link href="/owner/instruments/new" className="text-sm font-medium text-primary hover:underline">
-              Register an instrument →
-            </Link>
           </div>
         </section>
 

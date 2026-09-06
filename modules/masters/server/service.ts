@@ -7,6 +7,7 @@ import {
   CreateInspectionTemplateInput,
   CreateInstrumentTypeInput,
   CreateRegulatoryRuleInput,
+  DeletedOutput,
   InspectionTemplateOutput,
   InstrumentTypeOutput,
   ListAdministrativeUnitsInput,
@@ -18,6 +19,10 @@ import {
   ListRegulatoryRulesInput,
   ListRegulatoryRulesOutput,
   RegulatoryRuleOutput,
+  UpdateAdministrativeUnitInput,
+  UpdateInspectionTemplateInput,
+  UpdateInstrumentTypeInput,
+  UpdateRegulatoryRuleInput,
 } from "../schema";
 import { paginationMeta } from "@/schemas/shared";
 
@@ -27,6 +32,10 @@ function validation(path: string, message: string): never {
 
 function conflict(field: string, message: string): never {
   throw new ORPCError("CONFLICT", { data: { field, message } });
+}
+
+function notFound(resourceType: string, resourceId: string): never {
+  throw new ORPCError("NOT_FOUND", { data: { resourceType, resourceId } });
 }
 
 // Parent each level may point to; STATE has no parent. This also makes
@@ -40,6 +49,13 @@ const PARENT_TYPE: Record<AdminUnitType, AdminUnitType | null> = {
 
 function num(value: string): number {
   return Number(value);
+}
+
+/** Refuse a delete while any named reference still points at the row. */
+async function assertDeletable(refs: { label: string; check: () => Promise<unknown> }[]): Promise<void> {
+  for (const { label, check } of refs) {
+    if (await check()) conflict("id", `Cannot delete: still referenced by ${label}`);
+  }
 }
 
 export const mastersService = {
@@ -68,7 +84,7 @@ export const mastersService = {
       }
       const parent = await db.orm.public.AdministrativeUnit.first({ id: input.parentId! });
       if (!parent) {
-        throw new ORPCError("NOT_FOUND", { data: { resourceType: "AdministrativeUnit", resourceId: input.parentId! } });
+        notFound("AdministrativeUnit", input.parentId!);
       }
       if (parent.type !== expectedParent) {
         validation("parentId", `${input.type} must be a child of ${expectedParent}, not ${parent.type}`);
@@ -83,6 +99,48 @@ export const mastersService = {
       latitude: input.latitude ?? null,
       longitude: input.longitude ?? null,
     });
+  },
+
+  async updateAdministrativeUnit(input: UpdateAdministrativeUnitInput): Promise<AdministrativeUnitOutput> {
+    const existing = await db.orm.public.AdministrativeUnit.first({ id: input.id });
+    if (!existing) notFound("AdministrativeUnit", input.id);
+
+    const name = input.name ?? existing.name;
+    if (name !== existing.name) {
+      const sibling = await db.orm.public.AdministrativeUnit.where({
+        parentId: existing.parentId,
+        type: existing.type,
+        name,
+      }).first();
+      if (sibling) conflict("name", "A unit with this name already exists under the same parent");
+    }
+
+    await db.orm.public.AdministrativeUnit.where({ id: input.id }).update({
+      name,
+      latitude: input.latitude ?? existing.latitude,
+      longitude: input.longitude ?? existing.longitude,
+    });
+
+    return (await db.orm.public.AdministrativeUnit.first({ id: input.id }))!;
+  },
+
+  async deleteAdministrativeUnit(input: { id: string }): Promise<DeletedOutput> {
+    const existing = await db.orm.public.AdministrativeUnit.first({ id: input.id });
+    if (!existing) notFound("AdministrativeUnit", input.id);
+
+    await assertDeletable([
+      { label: "child units", check: () => db.orm.public.AdministrativeUnit.where({ parentId: input.id }).first() },
+      { label: "instruments", check: () => db.orm.public.Instrument.where({ administrativeUnitId: input.id }).first() },
+      { label: "LMO bases", check: () => db.orm.public.Lmo.where({ baseAdministrativeUnitId: input.id }).first() },
+      { label: "LMO jurisdictions", check: () => db.orm.public.LmoJurisdiction.where({ administrativeUnitId: input.id }).first() },
+      { label: "GATC locations", check: () => db.orm.public.Gatc.where({ administrativeUnitId: input.id }).first() },
+      { label: "GATC service areas", check: () => db.orm.public.GatcServiceArea.where({ administrativeUnitId: input.id }).first() },
+      { label: "admin scopes", check: () => db.orm.public.AdminScope.where({ administrativeUnitId: input.id }).first() },
+      { label: "location history", check: () => db.orm.public.InstrumentLocationHistory.where({ administrativeUnitId: input.id }).first() },
+    ]);
+
+    await db.orm.public.AdministrativeUnit.where({ id: input.id }).delete();
+    return { id: input.id };
   },
 
   // ----------------------------------------------------------- instrument types
@@ -100,6 +158,40 @@ export const mastersService = {
     const existing = await db.orm.public.InstrumentType.where({ code: input.code }).first();
     if (existing) conflict("code", "Instrument type code already exists");
     return db.orm.public.InstrumentType.create({ code: input.code, name: input.name, unit: input.unit });
+  },
+
+  async updateInstrumentType(input: UpdateInstrumentTypeInput): Promise<InstrumentTypeOutput> {
+    const existing = await db.orm.public.InstrumentType.first({ id: input.id });
+    if (!existing) notFound("InstrumentType", input.id);
+
+    const code = input.code ?? existing.code;
+    if (code !== existing.code) {
+      const clash = await db.orm.public.InstrumentType.where({ code }).first();
+      if (clash) conflict("code", "Instrument type code already exists");
+    }
+
+    await db.orm.public.InstrumentType.where({ id: input.id }).update({
+      code,
+      name: input.name ?? existing.name,
+      unit: input.unit ?? existing.unit,
+    });
+    return (await db.orm.public.InstrumentType.first({ id: input.id }))!;
+  },
+
+  async deleteInstrumentType(input: { id: string }): Promise<DeletedOutput> {
+    const existing = await db.orm.public.InstrumentType.first({ id: input.id });
+    if (!existing) notFound("InstrumentType", input.id);
+
+    await assertDeletable([
+      { label: "instruments", check: () => db.orm.public.Instrument.where({ instrumentTypeId: input.id }).first() },
+      { label: "LMO expertise", check: () => db.orm.public.LmoInstrumentType.where({ instrumentTypeId: input.id }).first() },
+      { label: "GATC authorizations", check: () => db.orm.public.GatcAuthorization.where({ instrumentTypeId: input.id }).first() },
+      { label: "regulatory rules", check: () => db.orm.public.RegulatoryRule.where({ instrumentTypeId: input.id }).first() },
+      { label: "inspection templates", check: () => db.orm.public.InspectionTemplate.where({ instrumentTypeId: input.id }).first() },
+    ]);
+
+    await db.orm.public.InstrumentType.where({ id: input.id }).delete();
+    return { id: input.id };
   },
 
   // ---------------------------------------------------------- regulatory rules
@@ -124,26 +216,9 @@ export const mastersService = {
     if (input.effectiveUntil && input.effectiveFrom >= input.effectiveUntil) {
       validation("effectiveUntil", "effectiveUntil must be after effectiveFrom");
     }
-
-    const overlapping = await db.orm.public.RegulatoryRule.where({
-      instrumentTypeId: input.instrumentTypeId,
-      accuracyClass: input.accuracyClass,
-    }).all();
-
-    const newMin = num(input.capacityMin);
-    const newMax = num(input.capacityMax);
-    const newUntil = input.effectiveUntil ? Date.parse(input.effectiveUntil) : Infinity;
-    const newFrom = Date.parse(input.effectiveFrom);
-
-    const clash = overlapping.some((r) => {
-      const existingUntil = r.effectiveUntil ? Date.parse(r.effectiveUntil) : Infinity;
-      const existingFrom = Date.parse(r.effectiveFrom);
-      const capacityOverlaps = num(r.capacityMin) <= newMax && num(r.capacityMax) >= newMin;
-      const windowOverlaps = existingFrom <= newUntil && newFrom <= existingUntil;
-      return capacityOverlaps && windowOverlaps;
-    });
-
-    if (clash) conflict("accuracyClass", "An active rule already covers this type, class, and capacity band");
+    if (await this.findRuleClash({ ...input, effectiveUntil: input.effectiveUntil ?? null })) {
+      conflict("accuracyClass", "An active rule already covers this type, class, and capacity band");
+    }
 
     return db.orm.public.RegulatoryRule.create({
       instrumentTypeId: input.instrumentTypeId,
@@ -154,6 +229,88 @@ export const mastersService = {
       verificationPeriodMonths: input.verificationPeriodMonths,
       effectiveFrom: input.effectiveFrom,
       effectiveUntil: input.effectiveUntil ?? null,
+    });
+  },
+
+  async updateRegulatoryRule(input: UpdateRegulatoryRuleInput): Promise<RegulatoryRuleOutput> {
+    const existing = await db.orm.public.RegulatoryRule.first({ id: input.id });
+    if (!existing) notFound("RegulatoryRule", input.id);
+
+    const next = {
+      instrumentTypeId: existing.instrumentTypeId,
+      accuracyClass: input.accuracyClass ?? existing.accuracyClass,
+      capacityMin: input.capacityMin ?? existing.capacityMin,
+      capacityMax: input.capacityMax ?? existing.capacityMax,
+      permissibleError: input.permissibleError ?? existing.permissibleError,
+      verificationPeriodMonths: input.verificationPeriodMonths ?? existing.verificationPeriodMonths,
+      effectiveFrom: input.effectiveFrom ?? existing.effectiveFrom,
+      effectiveUntil: input.effectiveUntil ?? existing.effectiveUntil,
+    };
+
+    if (num(next.capacityMin) > num(next.capacityMax)) {
+      validation("capacityMin", "capacityMin must be <= capacityMax");
+    }
+    if (next.effectiveUntil && next.effectiveFrom >= next.effectiveUntil) {
+      validation("effectiveUntil", "effectiveUntil must be after effectiveFrom");
+    }
+    if (await this.findRuleClash(next, input.id)) {
+      conflict("accuracyClass", "An active rule already covers this type, class, and capacity band");
+    }
+
+    await db.orm.public.RegulatoryRule.where({ id: input.id }).update({
+      accuracyClass: next.accuracyClass,
+      capacityMin: next.capacityMin,
+      capacityMax: next.capacityMax,
+      permissibleError: next.permissibleError,
+      verificationPeriodMonths: next.verificationPeriodMonths,
+      effectiveFrom: next.effectiveFrom,
+      effectiveUntil: next.effectiveUntil,
+    });
+
+    return (await db.orm.public.RegulatoryRule.first({ id: input.id }))!;
+  },
+
+  async deleteRegulatoryRule(input: { id: string }): Promise<DeletedOutput> {
+    const existing = await db.orm.public.RegulatoryRule.first({ id: input.id });
+    if (!existing) notFound("RegulatoryRule", input.id);
+
+    await assertDeletable([
+      { label: "inspections", check: () => db.orm.public.Inspection.where({ ruleVersionId: input.id }).first() },
+      { label: "certificates", check: () => db.orm.public.Certificate.where({ ruleVersionId: input.id }).first() },
+    ]);
+
+    await db.orm.public.RegulatoryRule.where({ id: input.id }).delete();
+    return { id: input.id };
+  },
+
+  async findRuleClash(
+    input: {
+      instrumentTypeId: string;
+      accuracyClass: string;
+      capacityMin: string;
+      capacityMax: string;
+      effectiveFrom: string;
+      effectiveUntil: string | null;
+    },
+    excludeId?: string,
+  ): Promise<boolean> {
+    const existing = await db.orm.public.RegulatoryRule.where({
+      instrumentTypeId: input.instrumentTypeId,
+      accuracyClass: input.accuracyClass,
+    }).all();
+
+    const newMin = num(input.capacityMin);
+    const newMax = num(input.capacityMax);
+    const newFrom = Date.parse(input.effectiveFrom);
+    const newUntil = input.effectiveUntil ? Date.parse(input.effectiveUntil) : Infinity;
+
+    return existing.some((r) => {
+      if (r.id === excludeId) return false;
+      const existingFrom = Date.parse(r.effectiveFrom);
+      const existingUntil = r.effectiveUntil ? Date.parse(r.effectiveUntil) : Infinity;
+      const capacityOverlaps = num(r.capacityMin) <= newMax && num(r.capacityMax) >= newMin;
+      const windowOverlaps = existingFrom <= newUntil && newFrom <= existingUntil;
+      return capacityOverlaps && windowOverlaps;
     });
   },
 
@@ -215,5 +372,35 @@ export const mastersService = {
     }
 
     return { ...template, items };
+  },
+
+  async updateInspectionTemplate(input: UpdateInspectionTemplateInput): Promise<InspectionTemplateOutput> {
+    const existing = await db.orm.public.InspectionTemplate.first({ id: input.id });
+    if (!existing) notFound("InspectionTemplate", input.id);
+
+    await db.orm.public.InspectionTemplate.where({ id: input.id }).update({
+      name: input.name ?? existing.name,
+      effectiveFrom: input.effectiveFrom ?? existing.effectiveFrom,
+      effectiveUntil: input.effectiveUntil ?? existing.effectiveUntil,
+      isActive: input.isActive ?? existing.isActive,
+    });
+
+    const updated = await db.orm.public.InspectionTemplate.first({ id: input.id });
+    const items = await db.orm.public.InspectionTemplateItem.where({ templateId: input.id })
+      .orderBy((i) => i.displayOrder.asc())
+      .all();
+    return { ...updated!, items };
+  },
+
+  async deleteInspectionTemplate(input: { id: string }): Promise<DeletedOutput> {
+    const existing = await db.orm.public.InspectionTemplate.first({ id: input.id });
+    if (!existing) notFound("InspectionTemplate", input.id);
+
+    await assertDeletable([
+      { label: "inspections", check: () => db.orm.public.Inspection.where({ templateId: input.id }).first() },
+    ]);
+
+    await db.orm.public.InspectionTemplate.where({ id: input.id }).delete();
+    return { id: input.id };
   },
 };

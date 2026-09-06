@@ -73,11 +73,6 @@ export const UpdateInstrumentInputSchema = z.object({
   accuracyClass: z.string().min(1).optional(),
   yearOfManufacture: z.number().int().min(1900).max(2100).optional(),
   purchaseDate: z.string().datetime().optional(),
-  address: z.string().min(1).optional(),
-  administrativeUnitId: z.string().min(1).optional(),
-  postalCode: z.string().optional(),
-  latitude: z.string().optional(),
-  longitude: z.string().optional(),
 });
 export type UpdateInstrumentInput = z.infer<typeof UpdateInstrumentInputSchema>;
 
@@ -85,6 +80,21 @@ export const GetInstrumentInputSchema = z.object({
   id: z.string().min(1, "Instrument ID is required"),
 });
 export type GetInstrumentInput = z.infer<typeof GetInstrumentInputSchema>;
+
+export const IdentifyInstrumentInputSchema = z.object({
+  code: z.string().min(1, "Instrument code is required"),
+});
+export type IdentifyInstrumentInput = z.infer<typeof IdentifyInstrumentInputSchema>;
+
+export const IdentifyInstrumentOutputSchema = z.object({
+  id: z.string(),
+  instrumentCode: z.string(),
+  serialNumber: z.string(),
+  status: z.string(),
+  instrumentTypeName: z.string(),
+  latestApplicationId: z.string().nullable(),
+});
+export type IdentifyInstrumentOutput = z.infer<typeof IdentifyInstrumentOutputSchema>;
 
 export const InstrumentPassportOutputSchema = z.object({
   instrument: InstrumentOutputSchema,

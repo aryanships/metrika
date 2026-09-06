@@ -7,6 +7,8 @@ import {
   GetInstrumentInputSchema,
   InstrumentOutputSchema,
   InstrumentPassportOutputSchema,
+  IdentifyInstrumentInputSchema,
+  IdentifyInstrumentOutputSchema,
 } from "./schema";
 
 export const listInstrumentsContract = base
@@ -15,6 +17,17 @@ export const listInstrumentsContract = base
     path: "/instruments",
     summary: "List instruments",
     description: "Lists registered instruments. Owners see only their own instruments.",
+    tags: ["Instruments"],
+  })
+  .input(ListInstrumentsInputSchema)
+  .output(ListInstrumentsOutputSchema);
+
+export const listInstrumentsForAdminContract = base
+  .route({
+    method: "GET",
+    path: "/instruments/admin",
+    summary: "List instruments (admin)",
+    description: "Lists instruments scoped to the admin's jurisdiction.",
     tags: ["Instruments"],
   })
   .input(ListInstrumentsInputSchema)
@@ -65,10 +78,23 @@ export const passportInstrumentContract = base
   .input(GetInstrumentInputSchema)
   .output(InstrumentPassportOutputSchema);
 
+export const identifyInstrumentContract = base
+  .route({
+    method: "GET",
+    path: "/instruments/identify",
+    summary: "Identify instrument by code",
+    description: "Field-safe lookup of an instrument by its permanent code for identification purposes.",
+    tags: ["Instruments"],
+  })
+  .input(IdentifyInstrumentInputSchema)
+  .output(IdentifyInstrumentOutputSchema);
+
 export const instrumentsContract = {
   list: listInstrumentsContract,
+  listForAdmin: listInstrumentsForAdminContract,
   get: getInstrumentContract,
   create: createInstrumentContract,
   update: updateInstrumentContract,
   passport: passportInstrumentContract,
+  identify: identifyInstrumentContract,
 };

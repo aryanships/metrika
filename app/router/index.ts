@@ -12,6 +12,7 @@ import { verificationRouter } from "@/modules/verification/server/router";
 import { notificationsRouter } from "@/modules/notifications/server/router";
 import { auditRouter } from "@/modules/audit/server/router";
 import { dashboardRouter } from "@/modules/dashboard/server/router";
+import { searchRouter } from "@/modules/search/server/router";
 
 export const router = {
   auth: authRouter,
@@ -28,6 +29,7 @@ export const router = {
   notifications: notificationsRouter,
   audit: auditRouter,
   dashboard: dashboardRouter,
+  search: searchRouter,
 };
 
 export type AppRouter = typeof router;

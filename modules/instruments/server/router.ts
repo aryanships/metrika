@@ -14,6 +14,12 @@ export const instrumentsRouter = implementer.router({
     return instrumentsService.list(input, context.user?.businessId ?? null);
   }),
 
+  listForAdmin: implementer.listForAdmin
+    .use(requireRole("STATE_ADMIN", "DISTRICT_ADMIN", "SYSTEM_ADMIN", "DEPARTMENT_OFFICIAL"))
+    .handler(async ({ input, context }) => {
+      return instrumentsService.listForAdmin(input, context.user!);
+    }),
+
   get: implementer.get.use(requireAuth).handler(async ({ input, context }) => {
     await requireInstrumentOwnership(context.user!, input.id);
     return instrumentsService.get(input);
@@ -36,5 +42,9 @@ export const instrumentsRouter = implementer.router({
   passport: implementer.passport.use(requireAuth).handler(async ({ input, context }) => {
     await requireInstrumentOwnership(context.user!, input.id);
     return instrumentsService.passport(input);
+  }),
+
+  identify: implementer.identify.use(requireAuth).handler(async ({ input }) => {
+    return instrumentsService.identify(input);
   }),
 });

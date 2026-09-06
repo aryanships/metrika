@@ -46,7 +46,8 @@ export const CreateUploadIntentInputSchema = z.object({
 export type CreateUploadIntentInput = z.infer<typeof CreateUploadIntentInputSchema>;
 
 export const UploadIntentOutputSchema = z.object({
-  uploadUrl: z.string().url(),
+  // Absolute (R2 presigned) or same-origin relative (local dev adapter).
+  uploadUrl: z.string().min(1),
   uploadToken: z.string(),
   expiresAt: z.string(),
   maxSizeBytes: z.number().int(),
@@ -75,13 +76,17 @@ export const AttachmentOutputSchema = z.object({
 });
 export type AttachmentOutput = z.infer<typeof AttachmentOutputSchema>;
 
+export const ListAttachmentsOutputSchema = z.array(AttachmentOutputSchema);
+export type ListAttachmentsOutput = z.infer<typeof ListAttachmentsOutputSchema>;
+
 export const GetDownloadUrlInputSchema = z.object({
   fileId: z.string().min(1, "File ID is required"),
 });
 export type GetDownloadUrlInput = z.infer<typeof GetDownloadUrlInputSchema>;
 
 export const DownloadUrlOutputSchema = z.object({
-  downloadUrl: z.string().url(),
+  // Absolute (R2 presigned) or same-origin relative (local dev adapter).
+  downloadUrl: z.string().min(1),
   expiresAt: z.string(),
   fileName: z.string(),
   contentType: z.string(),

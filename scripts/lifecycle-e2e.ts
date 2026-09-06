@@ -109,6 +109,11 @@ async function main(): Promise<void> {
       {
         applicationId: draft.id,
         measurements: [{ sequence: 1, code: "ZERO_LOAD", label: "Zero load", unit: "kg", standardValue: "0.000", observedValue: "0.000" }],
+        responses:
+          started.template?.items.map((item) => ({
+            templateItemId: item.id,
+            value: item.kind === "CHECKLIST" ? true : item.kind === "NUMERIC" ? 0 : "ok",
+          })) ?? [],
       },
       lmoUser,
     );
@@ -153,7 +158,7 @@ async function main(): Promise<void> {
       await orm.Attachment.where({ id: created.instrumentAttachmentId }).delete();
     }
     if (created.fileIds.length) {
-      await orm.FileObject.where((f) => f.id.in(created.fileIds)).delete();
+      await orm.FileObject.where((f) => f.id.in(created.fileIds)).deleteAll();
     }
   }
 }

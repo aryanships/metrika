@@ -31,6 +31,10 @@ export const applicationsRouter = implementer.router({
     return applicationsService.completeness(input, context.user!);
   }),
 
+  detail: implementer.detail.use(requireAuth).handler(async ({ input, context }) => {
+    return applicationsService.detail(input, context.user!);
+  }),
+
   createDraft: implementer.createDraft
     .use(requireRole("INSTRUMENT_OWNER"))
     .handler(async ({ input, context }) => {

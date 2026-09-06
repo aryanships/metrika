@@ -93,6 +93,36 @@ export function AdminDashboardSection() {
             <p className="text-sm text-muted-foreground">No officers.</p>
           )}
         </section>
+
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold">Certificates by status</h2>
+          {admin && Object.entries(admin.certificatesByStatus).length > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              {Object.entries(admin.certificatesByStatus).map(([status, count]) => (
+                <div key={status} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
+                  <span>{status.toLowerCase().replaceAll("_", " ")}</span>
+                  <span className="font-medium">{count}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No certificates.</p>
+          )}
+
+          <h2 className="mt-4 text-sm font-semibold">GATC workload</h2>
+          {admin && admin.gatcWorkload.length > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              {admin.gatcWorkload.map((gatc) => (
+                <div key={gatc.name} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
+                  <span>{gatc.name}</span>
+                  <span className="font-medium">{gatc.open} open</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No GATCs.</p>
+          )}
+        </section>
       </div>
     </div>
   );

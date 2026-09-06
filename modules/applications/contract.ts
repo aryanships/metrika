@@ -14,6 +14,7 @@ import {
   SetPriorityInputSchema,
   ApplicationOutputSchema,
   CompletenessOutputSchema,
+  ApplicationDetailOutputSchema,
 } from "./schema";
 
 export const listMineApplicationsContract = base
@@ -59,6 +60,17 @@ export const getCompletenessContract = base
   })
   .input(GetApplicationInputSchema)
   .output(CompletenessOutputSchema);
+
+export const getApplicationDetailContract = base
+  .route({
+    method: "GET",
+    path: "/applications/{id}/detail",
+    summary: "Get application detail with history",
+    description: "Retrieves the application plus its status history and completeness checklist.",
+    tags: ["Applications"],
+  })
+  .input(GetApplicationInputSchema)
+  .output(ApplicationDetailOutputSchema);
 
 export const createDraftApplicationContract = base
   .route({
@@ -164,6 +176,7 @@ export const applicationsContract = {
   listMine: listMineApplicationsContract,
   listQueue: listQueueContract,
   get: getApplicationContract,
+  detail: getApplicationDetailContract,
   completeness: getCompletenessContract,
   createDraft: createDraftApplicationContract,
   updateDraft: updateDraftApplicationContract,

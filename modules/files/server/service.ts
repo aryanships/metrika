@@ -2,6 +2,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { ORPCError } from "@orpc/server";
 import { db } from "@/prisma/db";
 import { storage } from "@/lib/storage";
+import { env } from "@/lib/env";
 import { requireStateScope } from "@/middleware/require-state-scope";
 import type { AppUser } from "@/middleware/context";
 import type { UserRole } from "@/modules/auth/schema";
@@ -146,9 +147,7 @@ async function assertCanAccessTarget(user: AppUser, target: AttachmentTarget): P
 }
 
 function authSecret(): string {
-  const secret = process.env.AUTH_SECRET;
-  if (!secret) throw new Error("AUTH_SECRET is not configured");
-  return secret;
+  return env.authSecret;
 }
 
 function b64url(data: string | Buffer): string {
@@ -336,5 +335,29 @@ export const filesService = {
 
     const { url, expiresAt } = storage.createDownloadUrl(file.objectKey);
     return { downloadUrl: url, expiresAt, fileName: file.fileName, contentType: file.mimeType };
+  },
+
+  async listAttachments(target: AttachmentTarget, user: AppUser): Promise<AttachmentOutput[]> {
+    await assertCanAccessTarget(user, target);
+
+    const id = targetId(target);
+    let query = db.orm.public.Attachment;
+    if (target.instrumentId) query = query.where({ instrumentId: id });
+    else if (target.applicationId) query = query.where({ applicationId: id });
+    else query = query.where({ inspectionId: id });
+
+    const attachments = await query.orderBy((a) => a.createdAt.desc()).all();
+    if (attachments.length === 0) return [];
+
+    const fileIds = attachments.map((a) => a.fileId);
+    const files = await db.orm.public.FileObject.where((f) => f.id.in(fileIds)).all();
+    const fileById = new Map(files.map((f) => [f.id, f]));
+
+    return attachments
+      .map((attachment) => {
+        const file = fileById.get(attachment.fileId);
+        return file ? toAttachmentOutput(attachment, file) : null;
+      })
+      .filter((output): output is AttachmentOutput => output !== null);
   },
 };

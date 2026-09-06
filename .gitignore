@@ -45,3 +45,6 @@ dist/
 
 plan/
 migrations/
+
+# local storage dev adapter
+.data/

@@ -33,7 +33,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'b75537e9f28530374740e28e3ec66d6c587852954dc98f8e34ac700d457b723c'>;
+  StorageHashBase<'d0fac5bad90945ab55c17e82d2d6f7ec3cf12fe39a3469488740e4fb6119cd74'>;
 export type ExecutionHash =
   ExecutionHashBase<'f18347476a82879caed5e364b33b5338dcb6f43a433d37b1c99d9c994a25f519'>;
 export type ProfileHash =
@@ -681,6 +681,7 @@ export type FieldOutputTypes = {
       readonly lmoId: CodecTypes['pg/text@1']['output'] | null;
       readonly gatcId: CodecTypes['pg/text@1']['output'] | null;
       readonly recommendedScore: CodecTypes['pg/numeric@1']['output'] | null;
+      readonly recommendation: CodecTypes['pg/json@1']['output'] | null;
       readonly wasOverridden: CodecTypes['pg/bool@1']['output'];
       readonly assignedById: CodecTypes['pg/text@1']['output'];
       readonly assignedAt: CodecTypes['pg/timestamptz-string@1']['output'];
@@ -1134,6 +1135,7 @@ export type FieldInputTypes = {
       readonly lmoId: CodecTypes['pg/text@1']['input'] | null;
       readonly gatcId: CodecTypes['pg/text@1']['input'] | null;
       readonly recommendedScore: CodecTypes['pg/numeric@1']['input'] | null;
+      readonly recommendation: CodecTypes['pg/json@1']['input'] | null;
       readonly wasOverridden: CodecTypes['pg/bool@1']['input'];
       readonly assignedById: CodecTypes['pg/text@1']['input'];
       readonly assignedAt: CodecTypes['pg/timestamptz-string@1']['input'];
@@ -1589,6 +1591,7 @@ export type StorageColumnTypes = {
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly lmoId: CodecTypes['pg/text@1']['output'] | null;
       readonly location: CodecTypes['pg/text@1']['output'] | null;
+      readonly recommendation: CodecTypes['pg/json@1']['output'] | null;
       readonly recommendedScore: CodecTypes['pg/numeric@1']['output'] | null;
       readonly route: 'LMO' | 'GATC';
       readonly scheduledEndAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
@@ -2042,6 +2045,7 @@ export type StorageColumnInputTypes = {
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly lmoId: CodecTypes['pg/text@1']['input'] | null;
       readonly location: CodecTypes['pg/text@1']['input'] | null;
+      readonly recommendation: CodecTypes['pg/json@1']['input'] | null;
       readonly recommendedScore: CodecTypes['pg/numeric@1']['input'] | null;
       readonly route: 'LMO' | 'GATC';
       readonly scheduledEndAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
@@ -5070,6 +5074,11 @@ type ContractBase = Omit<
                 readonly recommendedScore: {
                   readonly nativeType: 'numeric';
                   readonly codecId: 'pg/numeric@1';
+                  readonly nullable: true;
+                };
+                readonly recommendation: {
+                  readonly nativeType: 'json';
+                  readonly codecId: 'pg/json@1';
                   readonly nullable: true;
                 };
                 readonly wasOverridden: {
@@ -8748,6 +8757,10 @@ type ContractBase = Omit<
                 readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/numeric@1' };
               };
+              readonly recommendation: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/json@1' };
+              };
               readonly wasOverridden: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
@@ -8843,6 +8856,7 @@ type ContractBase = Omit<
                 readonly lmoId: { readonly column: 'lmoId' };
                 readonly gatcId: { readonly column: 'gatcId' };
                 readonly recommendedScore: { readonly column: 'recommendedScore' };
+                readonly recommendation: { readonly column: 'recommendation' };
                 readonly wasOverridden: { readonly column: 'wasOverridden' };
                 readonly assignedById: { readonly column: 'assignedById' };
                 readonly assignedAt: { readonly column: 'assignedAt' };

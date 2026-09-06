@@ -1,6 +1,10 @@
 import { createHash, randomBytes } from "node:crypto";
 import { ORPCError } from "@orpc/server";
 import { db } from "@/prisma/db";
+import { requireStateScope } from "@/middleware/require-state-scope";
+import { descendantUnitIds } from "@/lib/geo";
+import type { AppUser } from "@/middleware/context";
+import type { UserRole } from "@/modules/auth/schema";
 import {
   AdminRole,
   CreateGatcInput,
@@ -17,6 +21,8 @@ import {
   ProvisionAdminOutput,
   SetAdminScopesInput,
   SetAdminScopesOutput,
+  ListAdminsInput,
+  ListAdminsOutput,
 } from "../schema";
 import { paginationMeta } from "@/schemas/shared";
 
@@ -37,6 +43,21 @@ function notFound(resourceType: string, resourceId: string): never {
 }
 
 const ADMIN_ROLES: AdminRole[] = ["SYSTEM_ADMIN", "STATE_ADMIN", "DISTRICT_ADMIN", "DEPARTMENT_OFFICIAL"];
+const UNRESTRICTED_ROLES: readonly UserRole[] = ["SYSTEM_ADMIN", "DEPARTMENT_OFFICIAL"];
+
+/** Unit IDs visible to an admin, or null when unrestricted. */
+async function scopedUnitIds(user: AppUser): Promise<Set<string> | null> {
+  if (UNRESTRICTED_ROLES.some((r) => user.roles.includes(r))) return null;
+  const scopes = await db.orm.public.AdminScope.where({ userId: user.id }).all();
+  if (scopes.length === 0) return new Set();
+  return descendantUnitIds(scopes.map((s) => s.administrativeUnitId));
+}
+
+/** Reject a unit outside the admin's jurisdiction (no-op for unrestricted admins). */
+async function assertScoped(user: AppUser, unitId: string): Promise<void> {
+  if (UNRESTRICTED_ROLES.some((r) => user.roles.includes(r))) return;
+  await requireStateScope(user, unitId);
+}
 
 // ---------------------------------------------------------------------------
 // Invited-user creation. The raw token is returned for the demo; production
@@ -55,11 +76,17 @@ function newInvitation(): Invitation {
 
 export const organizationsService = {
   // --------------------------------------------------------------------- LMO
-  async listLmos(input: ListLmosInput): Promise<ListLmosOutput> {
+  async listLmos(input: ListLmosInput, user: AppUser): Promise<ListLmosOutput> {
     const page = input.page ?? 1;
     const limit = input.limit ?? 20;
     let query = db.orm.public.Lmo;
     if (input.activeOnly) query = query.where({ isActive: true });
+
+    const unitIds = await scopedUnitIds(user);
+    if (unitIds !== null) {
+      if (unitIds.size === 0) return { items: [], pagination: paginationMeta(0, page, limit) };
+      query = query.where((l) => l.baseAdministrativeUnitId.in([...unitIds]));
+    }
 
     const [lmos, totals] = await Promise.all([
       query.orderBy((l) => l.createdAt.desc()).offset((page - 1) * limit).limit(limit).all(),
@@ -91,10 +118,13 @@ export const organizationsService = {
     return { items, pagination: paginationMeta(totals.total, page, limit) };
   },
 
-  async createLmo(input: CreateLmoInput): Promise<LmoCreatedOutput> {
+  async createLmo(input: CreateLmoInput, user: AppUser): Promise<LmoCreatedOutput> {
     const invitation = newInvitation();
 
-    const { lmo, user } = await db.transaction(async (tx) => {
+    await assertScoped(user, input.baseAdministrativeUnitId);
+    for (const unitId of input.jurisdictionIds) await assertScoped(user, unitId);
+
+    const { lmo, user: createdUser } = await db.transaction(async (tx) => {
       const orm = tx.orm.public;
 
       const existingUser = await orm.User.where({ email: input.email }).first();
@@ -138,8 +168,8 @@ export const organizationsService = {
       designation: lmo.designation,
       isActive: lmo.isActive,
       baseAdministrativeUnitId: lmo.baseAdministrativeUnitId,
-      email: user.email,
-      fullName: user.fullName,
+      email: createdUser.email,
+      fullName: createdUser.fullName,
       expertiseTypeIds: input.expertiseTypeIds,
       jurisdictionIds: input.jurisdictionIds,
       createdAt: lmo.createdAt,
@@ -148,11 +178,17 @@ export const organizationsService = {
   },
 
   // -------------------------------------------------------------------- GATC
-  async listGatcs(input: ListGatcsInput): Promise<ListGatcsOutput> {
+  async listGatcs(input: ListGatcsInput, user: AppUser): Promise<ListGatcsOutput> {
     const page = input.page ?? 1;
     const limit = input.limit ?? 20;
     let query = db.orm.public.Gatc;
     if (input.activeOnly) query = query.where({ isActive: true });
+
+    const unitIds = await scopedUnitIds(user);
+    if (unitIds !== null) {
+      if (unitIds.size === 0) return { items: [], pagination: paginationMeta(0, page, limit) };
+      query = query.where((g) => g.administrativeUnitId.in([...unitIds]));
+    }
 
     const [gatcs, totals] = await Promise.all([
       query.orderBy((g) => g.createdAt.desc()).offset((page - 1) * limit).limit(limit).all(),
@@ -186,10 +222,13 @@ export const organizationsService = {
     return { items, pagination: paginationMeta(totals.total, page, limit) };
   },
 
-  async createGatc(input: CreateGatcInput): Promise<GatcOutput> {
+  async createGatc(input: CreateGatcInput, user: AppUser): Promise<GatcOutput> {
     if (input.approvalValidFrom >= input.approvalValidUntil) {
       validation("approvalValidUntil", "approvalValidUntil must be after approvalValidFrom");
     }
+
+    await assertScoped(user, input.administrativeUnitId);
+    for (const unitId of input.serviceAreaIds) await assertScoped(user, unitId);
 
     const gatc = await db.transaction(async (tx) => {
       const orm = tx.orm.public;
@@ -241,13 +280,14 @@ export const organizationsService = {
     };
   },
 
-  async inviteGatcStaff(input: InviteGatcStaffInput): Promise<InviteGatcStaffOutput> {
+  async inviteGatcStaff(input: InviteGatcStaffInput, user: AppUser): Promise<InviteGatcStaffOutput> {
     const gatc = await db.orm.public.Gatc.first({ id: input.gatcId });
     if (!gatc) notFound("Gatc", input.gatcId);
+    await assertScoped(user, gatc.administrativeUnitId);
 
     let invitationToken: string | null = null;
 
-    const user = await db.transaction(async (tx) => {
+    const invitedUser = await db.transaction(async (tx) => {
       const orm = tx.orm.public;
 
       let invited = await orm.User.where({ email: input.email }).first();
@@ -282,10 +322,52 @@ export const organizationsService = {
       return invited;
     });
 
-    return { gatcId: input.gatcId, userId: user.id, role: input.role, invitationToken };
+    return { gatcId: input.gatcId, userId: invitedUser.id, role: input.role, invitationToken };
   },
 
   // ------------------------------------------------------- admin provisioning
+  async listAdmins(input: ListAdminsInput): Promise<ListAdminsOutput> {
+    const page = input.page ?? 1;
+    const limit = input.limit ?? 20;
+
+    const roleRows = await db.orm.public.UserRole.where((r) => r.role.in(ADMIN_ROLES)).all();
+    const rolesByUser = new Map<string, AdminRole[]>();
+    for (const r of roleRows) {
+      const list = rolesByUser.get(r.userId) ?? [];
+      list.push(r.role as AdminRole);
+      rolesByUser.set(r.userId, list);
+    }
+    const userIds = [...rolesByUser.keys()];
+    if (userIds.length === 0) return { items: [], pagination: paginationMeta(0, page, limit) };
+
+    const [users, scopes] = await Promise.all([
+      db.orm.public.User.where((u) => u.id.in(userIds))
+        .orderBy((u) => u.email.asc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all(),
+      db.orm.public.AdminScope.where((s) => s.userId.in(userIds)).all(),
+    ]);
+
+    const scopesByUser = new Map<string, string[]>();
+    for (const s of scopes) {
+      const list = scopesByUser.get(s.userId) ?? [];
+      list.push(s.administrativeUnitId);
+      scopesByUser.set(s.userId, list);
+    }
+
+    const items = users.map((u) => ({
+      userId: u.id,
+      email: u.email,
+      fullName: u.fullName,
+      isActive: u.isActive,
+      roles: rolesByUser.get(u.id) ?? [],
+      scopeAdministrativeUnitIds: scopesByUser.get(u.id) ?? [],
+    }));
+
+    return { items, pagination: paginationMeta(userIds.length, page, limit) };
+  },
+
   async provisionAdmin(input: ProvisionAdminInput): Promise<ProvisionAdminOutput> {
     const expectedType =
       input.role === "STATE_ADMIN" ? "STATE" : input.role === "DISTRICT_ADMIN" ? "DISTRICT" : null;
@@ -356,13 +438,33 @@ export const organizationsService = {
     if (!user) notFound("User", input.userId);
 
     const roles = await db.orm.public.UserRole.where({ userId: user.id }).all();
-    if (!roles.some((r) => ADMIN_ROLES.includes(r.role as AdminRole))) {
+    const adminRoles = roles.map((r) => r.role).filter((r) => ADMIN_ROLES.includes(r as AdminRole));
+    if (adminRoles.length === 0) {
       validation("userId", "User has no administrative role");
+    }
+
+    // Each scope unit must match the level its role governs.
+    const allowedTypes = new Set<string>();
+    if (adminRoles.includes("STATE_ADMIN")) allowedTypes.add("STATE");
+    if (adminRoles.includes("DISTRICT_ADMIN")) allowedTypes.add("DISTRICT");
+
+    if (allowedTypes.size === 0) {
+      if (input.administrativeUnitIds.length > 0) {
+        validation("administrativeUnitIds", `${adminRoles.join(", ")} does not accept scoped units`);
+      }
+    } else {
+      for (const id of input.administrativeUnitIds) {
+        const unit = await db.orm.public.AdministrativeUnit.first({ id });
+        if (!unit) notFound("AdministrativeUnit", id);
+        if (!allowedTypes.has(unit.type)) {
+          validation("administrativeUnitIds", `${adminRoles.join(", ")} scope must be a ${[...allowedTypes].join(" or ")} unit`);
+        }
+      }
     }
 
     await db.transaction(async (tx) => {
       const orm = tx.orm.public;
-      await orm.AdminScope.where({ userId: input.userId }).delete();
+      await orm.AdminScope.where({ userId: input.userId }).deleteAll();
       for (const unitId of input.administrativeUnitIds) {
         await orm.AdminScope.create({ userId: input.userId, administrativeUnitId: unitId });
       }
