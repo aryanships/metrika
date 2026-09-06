@@ -6,7 +6,7 @@ export type SortOrder = z.infer<typeof SortOrderSchema>;
 export const PaginationInputSchema = z.object({
   cursor: z.string().optional(),
   page: z.number().int().min(1).default(1),
-  limit: z.number().int().min(1).max(100).default(20),
+  limit: z.number().int().min(1).max(200).default(20),
   search: z.string().trim().optional(),
   sortBy: z.string().optional(),
   sortOrder: SortOrderSchema.default("desc"),

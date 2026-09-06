@@ -15,12 +15,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+const DEMO_LOGINS = [
+  { label: "Merchant", icon: "🏪", email: "owner.reliance@retail.in" },
+  { label: "LMO Officer", icon: "⚖️", email: "lmo.sharma@metrika.gov.in" },
+  { label: "GATC Lab", icon: "🏢", email: "manager.apex@gatc.org" },
+  { label: "Authority", icon: "🏛️", email: "distadmin.pune@metrika.gov.in" },
+  { label: "System Admin", icon: "🖥️", email: "admin@metrika.gov.in" },
+] as const;
+
+const DEMO_PASSWORD = "Demo1234!";
+
 export default function LoginPage() {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LoginInput>({
     resolver: zodResolver(LoginInputSchema),
@@ -38,6 +49,11 @@ export default function LoginPage() {
       toast.error(describeError(err));
       setPending(false);
     }
+  }
+
+  function fillDemo(email: string) {
+    setValue("email", email, { shouldValidate: true });
+    setValue("password", DEMO_PASSWORD, { shouldValidate: true });
   }
 
   return (
@@ -79,6 +95,27 @@ export default function LoginPage() {
             </Link>
           </div>
         </CardContent>
+
+        <div className="space-y-2 border-t p-3">
+          <span className="block text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            1-click demo logins
+          </span>
+          <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+            {DEMO_LOGINS.map((demo) => (
+              <button
+                key={demo.email}
+                type="button"
+                onClick={() => fillDemo(demo.email)}
+                className="rounded-lg border bg-background p-1.5 text-left font-medium transition hover:bg-muted"
+              >
+                {demo.icon} <strong>{demo.label}</strong>
+              </button>
+            ))}
+          </div>
+          <p className="text-center text-[10px] text-muted-foreground">
+            All demo accounts use password <span className="font-mono">{DEMO_PASSWORD}</span>
+          </p>
+        </div>
       </Card>
 
       <p className="max-w-sm text-center text-xs text-muted-foreground">

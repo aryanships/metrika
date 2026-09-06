@@ -3,21 +3,32 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ScanLineIcon } from "lucide-react";
+import { QrCodeIcon, ScanLineIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { QrScannerModal } from "@/components/qr-scanner-modal";
+
+const EXAMPLES = [
+  { code: "CERT-2026-0008", label: "Active", tone: "emerald" },
+  { code: "CERT-2024-0001", label: "Expired", tone: "rose" },
+] as const;
 
 export default function VerifySearchPage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
+
+  function go(code: string) {
+    router.push(`/verify/c/${encodeURIComponent(code)}`);
+  }
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const code = query.trim();
     if (!code) return;
-    router.push(`/verify/c/${encodeURIComponent(code)}`);
+    go(code);
   }
 
   return (
@@ -30,7 +41,7 @@ export default function VerifySearchPage() {
         <CardHeader>
           <CardTitle>Verify a certificate</CardTitle>
           <CardDescription>
-            Enter a certificate number or instrument code to check its authenticity against the
+            Enter a certificate number or scan the QR code to check its authenticity against the
             official record.
           </CardDescription>
         </CardHeader>
@@ -46,11 +57,35 @@ export default function VerifySearchPage() {
                 className="font-mono"
               />
             </div>
-            <Button type="submit" className="w-full">
-              <ScanLineIcon />
-              Verify
-            </Button>
+            <div className="flex gap-2">
+              <Button type="submit" className="flex-1">
+                <ScanLineIcon />
+                Verify
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setScannerOpen(true)}>
+                <QrCodeIcon className="text-primary" />
+                Scan QR
+              </Button>
+            </div>
           </form>
+
+          <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t pt-4 text-xs">
+            <span className="text-muted-foreground">Try an example:</span>
+            {EXAMPLES.map((example) => (
+              <button
+                key={example.code}
+                type="button"
+                onClick={() => go(example.code)}
+                className={`rounded-md border px-2 py-0.5 font-mono text-[11px] transition ${
+                  example.tone === "emerald"
+                    ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20"
+                    : "border-rose-500/20 bg-rose-500/10 text-rose-600 hover:bg-rose-500/20"
+                }`}
+              >
+                {example.code} ({example.label})
+              </button>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
@@ -58,6 +93,8 @@ export default function VerifySearchPage() {
         This is a prototype verification service for a demonstration. It is not a government-issued
         legal certificate.
       </p>
+
+      <QrScannerModal open={scannerOpen} onClose={() => setScannerOpen(false)} onScan={go} />
     </main>
   );
 }
