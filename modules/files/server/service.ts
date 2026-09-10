@@ -120,9 +120,18 @@ async function assertAssignedStaff(
     }
   }
 
-  if (applicationId) {
-    const workOrder = await db.orm.public.WorkOrder.where({ applicationId }).first();
-    if (workOrder) {
+  // For an instrument target there is no single application, so fall back to
+  // any work order covering an application of that instrument.
+  let applicationIds = applicationId ? [applicationId] : [] as string[];
+  if (applicationIds.length === 0 && target.instrumentId) {
+    applicationIds = (
+      await db.orm.public.Application.where({ instrumentId: target.instrumentId }).select("id").all()
+    ).map((a) => a.id);
+  }
+
+  if (applicationIds.length > 0) {
+    const workOrders = await db.orm.public.WorkOrder.where((w) => w.applicationId.in(applicationIds)).all();
+    for (const workOrder of workOrders) {
       if (lmo && workOrder.lmoId === lmo.id) return;
       if (workOrder.gatcId && (await hasActiveMembership(user.id, workOrder.gatcId))) return;
     }
