@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { ShieldCheckIcon, ShieldXIcon, TriangleAlertIcon } from "lucide-react";
+import { HistoryIcon, ShieldCheckIcon, ShieldXIcon, TriangleAlertIcon } from "lucide-react";
 import { verificationService } from "@/modules/verification/server/service";
 import { getClientIp } from "@/middleware/context";
 import { Badge } from "@/components/ui/badge";
+import { ThemeToggle } from "@/components/theme-toggle";
 import type { PublicVerificationOutput } from "@/modules/verification/schema";
 
 function formatDate(iso: string): string {
@@ -24,6 +25,9 @@ export default async function VerifyCertificatePage({ params }: { params: Promis
   if (!result) {
     return (
       <main className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center px-4 py-10">
+        <div className="fixed right-4 top-4">
+          <ThemeToggle />
+        </div>
         <Link href="/" className="mb-8 self-center text-sm font-semibold">
           Digital Metrology
         </Link>
@@ -45,6 +49,9 @@ export default async function VerifyCertificatePage({ params }: { params: Promis
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center px-4 py-10">
+      <div className="fixed right-4 top-4">
+        <ThemeToggle />
+      </div>
       <Link href="/" className="mb-8 self-center text-sm font-semibold">
         Digital Metrology
       </Link>
@@ -102,6 +109,63 @@ export default async function VerifyCertificatePage({ params }: { params: Promis
           <span>Checked {formatDate(result.verificationTimestamp)}</span>
         </footer>
       </section>
+
+      {result.history.length > 0 ? (
+        <section className="mt-6 overflow-hidden rounded-xl border border-border bg-card">
+          <div className="bg-slate-900 p-4 text-white">
+            <div className="flex items-center gap-2">
+              <HistoryIcon className="size-5 text-amber-400" />
+              <div>
+                <h2 className="text-sm font-bold">Digital Metrology Passport</h2>
+                <p className="text-[11px] text-slate-300">Lifecycle verification history for this instrument</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-6">
+            <div className="relative space-y-6 pl-6 before:absolute before:bottom-2 before:left-2.5 before:top-2 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-800">
+              {result.history.map((entry, idx) => {
+                const isCurrent = idx === 0;
+                const expired = entry.status === "EXPIRED" || entry.status === "SUPERSEDED";
+                const active = entry.status === "ACTIVE" || entry.status === "EXPIRING_SOON";
+                const tone = isCurrent && active ? "emerald" : expired ? "rose" : "slate";
+                const toneText =
+                  tone === "emerald" ? "text-emerald-600" : tone === "rose" ? "text-rose-600" : "text-slate-500";
+                const toneBg =
+                  tone === "emerald" ? "bg-emerald-500" : tone === "rose" ? "bg-rose-500" : "bg-slate-400";
+                const toneBorder =
+                  tone === "emerald" ? "border-emerald-500" : tone === "rose" ? "border-rose-500" : "border-slate-400";
+
+                return (
+                  <div key={entry.certificateCode} className="relative">
+                    <div
+                      className={`absolute -left-6 top-0 flex size-5 items-center justify-center rounded-full border-2 bg-background ${toneBorder}`}
+                    >
+                      <div className={`size-2 rounded-full ${toneBg}`} />
+                    </div>
+                    <div className="space-y-1.5 rounded-xl border border-border bg-card p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-mono text-sm font-semibold">{entry.certificateCode}</span>
+                        {isCurrent ? (
+                          <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                            Current
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Verified {formatDate(entry.verifiedAt)} · Valid until{" "}
+                        <span className={`font-semibold ${toneText}`}>{formatDate(entry.validUntil)}</span>
+                      </p>
+                      <p className={`text-[11px] font-medium capitalize ${toneText}`}>
+                        {entry.status.toLowerCase().replaceAll("_", " ")}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
         This is a prototype verification record for a demonstration. It is not a government-issued

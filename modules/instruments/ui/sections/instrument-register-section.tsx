@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
+import { toIsoDateTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { FileUpload } from "@/components/file-upload";
 import type { AttachmentOutput } from "@/modules/files/schema";
@@ -28,15 +29,12 @@ function Field({ label, children, optional }: { label: string; children: React.R
 
 const PHOTO_KINDS = [
   { kind: "INSTRUMENT_FRONT", label: "Instrument front" },
+  { kind: "NAMEPLATE", label: "Nameplate / rating label" },
   { kind: "SERIAL_NUMBER", label: "Serial number" },
-  { kind: "NAMEPLATE", label: "Nameplate" },
-  { kind: "CONDITION", label: "Current condition" },
 ] as const;
 
 const DOCUMENT_KINDS = [
-  { kind: "PREVIOUS_CERTIFICATE", label: "Previous certificate" },
   { kind: "PURCHASE_DOCUMENT", label: "Purchase document" },
-  { kind: "APPROVAL_DOCUMENT", label: "Approval / model document" },
 ] as const;
 
 const EMPTY = {
@@ -64,7 +62,7 @@ export function InstrumentRegisterSection() {
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<string | null>(null);
-  const [uploaded, setUploaded] = useState<AttachmentOutput[]>([]);
+  const [attachmentsByKind, setAttachmentsByKind] = useState<Record<string, AttachmentOutput>>({});
 
   const typesQuery = useQuery(orpc.masters.listInstrumentTypes.queryOptions({ input: { page: 1, limit: 100 } }));
   const statesQuery = useQuery(orpc.masters.listAdministrativeUnits.queryOptions({ input: { type: "STATE", page: 1, limit: 100 } }));
@@ -128,6 +126,11 @@ export function InstrumentRegisterSection() {
       return;
     }
     setError(null);
+    if (createdId) {
+      // Instrument was already registered; advance directly without creating duplicate
+      setStep(3);
+      return;
+    }
     try {
       const created = await create.mutateAsync({
         instrumentTypeId: form.instrumentTypeId,
@@ -137,7 +140,7 @@ export function InstrumentRegisterSection() {
         capacity: form.capacity,
         accuracyClass: form.accuracyClass,
         yearOfManufacture: form.yearOfManufacture ? Number(form.yearOfManufacture) : undefined,
-        purchaseDate: form.purchaseDate || undefined,
+        purchaseDate: toIsoDateTime(form.purchaseDate),
         address: form.address,
         administrativeUnitId,
         postalCode: form.postalCode || undefined,
@@ -149,6 +152,18 @@ export function InstrumentRegisterSection() {
     } catch (err) {
       setError(describeError(err));
     }
+  }
+
+  function handleAttachmentUploaded(kind: string, attachment: AttachmentOutput) {
+    setAttachmentsByKind((prev) => ({ ...prev, [kind]: attachment }));
+  }
+
+  function handleAttachmentRemoved(kind: string) {
+    setAttachmentsByKind((prev) => {
+      const next = { ...prev };
+      delete next[kind];
+      return next;
+    });
   }
 
   return (
@@ -236,7 +251,7 @@ export function InstrumentRegisterSection() {
                 ))}
               </select>
             </Field>
-            <Field label="Tehsil">
+            <Field label="Tehsil" optional>
               <select className={selectClass} value={form.tehsilId} onChange={(e) => selectUnit("tehsilId", e.target.value)} disabled={!form.districtId}>
                 <option value="">Select tehsil…</option>
                 {(tehsilsQuery.data?.items ?? []).map((u) => (
@@ -276,13 +291,17 @@ export function InstrumentRegisterSection() {
 
       {step === 3 && createdId && (
         <div className="flex flex-col gap-6">
-          <p className="text-sm text-emerald-700 dark:text-emerald-400">
-            Instrument registered. Upload supporting documents and photos (optional, can be added later).
-          </p>
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-800 dark:text-emerald-300">
+            <p className="font-semibold">Instrument Registered Successfully</p>
+            <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-400">
+              Photos and documents are optional — you can upload them now or add them later from the instrument passport.
+            </p>
+          </div>
+
           <div>
-            <h3 className="text-sm font-semibold">Photos</h3>
-            <p className="text-xs text-muted-foreground">Front, serial number, nameplate, and current condition.</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <h3 className="text-sm font-semibold">Photos <span className="font-normal text-muted-foreground">(optional)</span></h3>
+            <p className="text-xs text-muted-foreground">Front view, rating label/nameplate, and stamped serial number.</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {PHOTO_KINDS.map(({ kind, label }) => (
                 <FileUpload
                   key={kind}
@@ -291,14 +310,17 @@ export function InstrumentRegisterSection() {
                   accept="image/*"
                   capture="environment"
                   label={label}
-                  onUploaded={(a) => setUploaded((list) => [...list, a])}
+                  value={attachmentsByKind[kind]}
+                  onUploaded={(a) => handleAttachmentUploaded(kind, a)}
+                  onRemoved={() => handleAttachmentRemoved(kind)}
                 />
               ))}
             </div>
           </div>
+
           <div>
-            <h3 className="text-sm font-semibold">Documents</h3>
-            <p className="text-xs text-muted-foreground">Previous certificate, purchase document, and approval documents.</p>
+            <h3 className="text-sm font-semibold">Documents <span className="font-normal text-muted-foreground">(optional)</span></h3>
+            <p className="text-xs text-muted-foreground">Purchase invoice, bill, or warranty document.</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {DOCUMENT_KINDS.map(({ kind, label }) => (
                 <FileUpload
@@ -307,20 +329,22 @@ export function InstrumentRegisterSection() {
                   target={{ instrumentId: createdId }}
                   accept="application/pdf,image/*"
                   label={label}
-                  onUploaded={(a) => setUploaded((list) => [...list, a])}
+                  value={attachmentsByKind[kind]}
+                  onUploaded={(a) => handleAttachmentUploaded(kind, a)}
+                  onRemoved={() => handleAttachmentRemoved(kind)}
                 />
               ))}
             </div>
           </div>
-          {uploaded.length > 0 && (
-            <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
-              {uploaded.map((a) => (
-                <li key={a.id}>✓ {a.fileName}</li>
-              ))}
-            </ul>
-          )}
-          <div className="flex justify-end gap-2">
+
+          <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
             <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
+            <Button
+              variant="ghost"
+              onClick={() => { router.push(`/business/instruments/${createdId}`); router.refresh(); }}
+            >
+              Skip for now
+            </Button>
             <Button onClick={() => { router.push(`/business/instruments/${createdId}`); router.refresh(); }}>
               View digital passport
             </Button>

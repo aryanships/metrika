@@ -6,6 +6,7 @@ import { ZodToJsonSchemaConverter } from "@orpc/zod";
 import { CORSPlugin } from "@orpc/server/plugins";
 import { onError } from "@orpc/server";
 import { router } from "@/app/router";
+import { errorStatusMap } from "@/contracts/base";
 import { createInitialContext } from "@/middleware/context";
 
 const zodConverter = new ZodToJsonSchemaConverter();
@@ -15,6 +16,7 @@ const generator = new OpenAPIGenerator({
 });
 
 const handler = new OpenAPIHandler(router, {
+    errorStatusMap,
     plugins: [
         new CORSPlugin(),
         new SmartCoercionHandlerPlugin({ converters: [zodConverter] }),

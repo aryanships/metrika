@@ -254,6 +254,14 @@ export async function main() {
       mpe: '50.0',
       months: 60,
     },
+    {
+      typeId: pwbType.id,
+      accuracyClass: 'Class I',
+      min: '0.0001',
+      max: '500.0',
+      mpe: '0.001',
+      months: 12,
+    },
   ];
 
   const seededRules: NonNullable<Awaited<ReturnType<typeof orm.RegulatoryRule["first"]>>>[] = [];
@@ -817,27 +825,27 @@ export async function main() {
     // Certificate if specified
     if (cfg.cert) {
       let cert = await orm.Certificate.where({ certificateCode: cfg.cert.code }).first();
-      if (!cert) {
-        const rule = ruleFor(inst);
-        const businessName = seededBusinesses.find((b) => b.business.id === inst.businessId)?.business.businessName ?? '';
-        const payloadHash = hashPayload(buildCanonicalPayload({
-          certificateCode: cfg.cert.code,
-          applicationCode: cfg.appCode,
-          instrumentCode: inst.instrumentCode,
-          manufacturer: inst.manufacturer,
-          model: inst.model,
-          serialNumber: inst.serialNumber,
-          instrumentTypeName: typeNameById.get(inst.instrumentTypeId) ?? '',
-          capacity: inst.capacity,
-          accuracyClass: inst.accuracyClass,
-          businessName,
-          result: 'PASS',
-          ruleReference: rule?.id ?? '',
-          verifiedAt: cfg.cert.verifiedAt,
-          validUntil: cfg.cert.validUntil,
-          issuingAuthority: ISSUING_AUTHORITY,
-        }));
+      const rule = ruleFor(inst);
+      const businessName = seededBusinesses.find((b) => b.business.id === inst.businessId)?.business.businessName ?? '';
+      const payloadHash = hashPayload(buildCanonicalPayload({
+        certificateCode: cfg.cert.code,
+        applicationCode: cfg.appCode,
+        instrumentCode: inst.instrumentCode,
+        manufacturer: inst.manufacturer,
+        model: inst.model,
+        serialNumber: inst.serialNumber,
+        instrumentTypeName: typeNameById.get(inst.instrumentTypeId) ?? '',
+        capacity: inst.capacity,
+        accuracyClass: inst.accuracyClass,
+        businessName,
+        result: 'PASS',
+        ruleReference: rule?.id ?? '',
+        verifiedAt: cfg.cert.verifiedAt,
+        validUntil: cfg.cert.validUntil,
+        issuingAuthority: ISSUING_AUTHORITY,
+      }));
 
+      if (!cert) {
         cert = await orm.Certificate.create({
           certificateCode: cfg.cert.code,
           applicationId: app.id,
@@ -855,6 +863,9 @@ export async function main() {
           toStatus: cfg.cert.status,
           reason: 'Initial verification certificate generated',
         });
+      } else {
+        await orm.Certificate.where({ id: cert.id }).update({ payloadHash, ruleVersionId: rule?.id ?? null });
+      }
 
         // Add sample public verification check
         await orm.CertificateVerification.create({
@@ -866,7 +877,6 @@ export async function main() {
         });
       }
     }
-  }
 
   // 11. Sample Notifications & Audit Log
   console.log('🔔 Seeding initial notifications and audit records...');

@@ -7,7 +7,7 @@ import type { AppContext } from "@/middleware/context";
 
 const implementer = implement(organizationsContract).$context<AppContext>();
 
-const ADMIN_STAFF = ["SYSTEM_ADMIN", "STATE_ADMIN"] as const;
+const ADMIN_STAFF = ["SYSTEM_ADMIN", "STATE_ADMIN", "DISTRICT_ADMIN"] as const;
 
 export const organizationsRouter = implementer.router({
   listLmos: implementer.listLmos.use(requireRole("SYSTEM_ADMIN", "STATE_ADMIN", "DISTRICT_ADMIN")).handler(

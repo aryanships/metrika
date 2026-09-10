@@ -48,7 +48,7 @@ function AdminAccountsContent() {
   const [editingScopes, setEditingScopes] = useState<AdminAccountOutput | null>(null);
   const [scopeSelection, setScopeSelection] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [invitation, setInvitation] = useState<string | null>(null);
+  const [invitation, setInvitation] = useState<{ email: string; token: string } | null>(null);
 
   const { data } = useSuspenseQuery(orpc.organizations.listAdmins.queryOptions({ input: { page: 1, limit: 100 } }));
   const unitsQuery = useQuery(orpc.masters.listAdministrativeUnits.queryOptions({ input: { page: 1, limit: 100 } }));
@@ -88,7 +88,7 @@ function AdminAccountsContent() {
         role: form.role,
         scopeAdministrativeUnitIds: scopes,
       });
-      setInvitation(created.invitationToken);
+      setInvitation(created.invitationToken ? { email: created.email, token: created.invitationToken } : null);
       setForm(EMPTY);
       setScopes([]);
     } catch (err) {
@@ -118,8 +118,13 @@ function AdminAccountsContent() {
       {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
       {invitation && (
         <div className="rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400">
-          <p className="font-medium">Account provisioned. Share this one-time invitation token:</p>
-          <p className="mt-1 break-all font-mono">{invitation}</p>
+          <p className="font-medium">Account provisioned for {invitation.email}. Share this invitation link:</p>
+          <a
+            className="mt-1 block break-all font-mono underline"
+            href={`/accept-invitation?email=${encodeURIComponent(invitation.email)}&token=${encodeURIComponent(invitation.token)}`}
+          >
+            Accept invitation
+          </a>
         </div>
       )}
 

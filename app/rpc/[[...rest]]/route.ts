@@ -1,9 +1,11 @@
 import { router } from "@/app/router";
+import { errorStatusMap } from "@/contracts/base";
 import { onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import { createInitialContext } from "@/middleware/context";
 
 const handler = new RPCHandler(router, {
+  errorStatusMap,
   interceptors: [
     onError((error) => {
       console.error(error);

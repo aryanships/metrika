@@ -2,10 +2,25 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
+import {
+  CalendarClockIcon,
+  ClipboardListIcon,
+  FileCheck2Icon,
+  PlusIcon,
+  QrCodeIcon,
+  ScaleIcon,
+  StoreIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import { useMutation, useQuery, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
+import { formatDateTime } from "@/lib/format";
+import { useAuth } from "@/hooks/use-auth";
 import { QueryErrorBoundary } from "@/components/query-error-boundary";
 import { Skeleton } from "@/components/ui/skeleton";
+import { buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { InstrumentStatusBadge } from "@/modules/instruments/ui/components/instrument-status-badge";
 import { CertificateStatusBadge } from "@/modules/certificates/ui/components/certificate-status-badge";
 import type { InstrumentStatus } from "@/modules/instruments/schema";
@@ -15,14 +30,45 @@ function totalOf(record: Record<string, number>): number {
   return Object.values(record).reduce((sum, n) => sum + n, 0);
 }
 
-function StatCard({ label, value, href }: { label: string; value: number; href?: string }) {
+const STAT_TONES = {
+  primary: "text-primary",
+  emerald: "text-emerald-600",
+  blue: "text-blue-600",
+  amber: "text-amber-600",
+} as const;
+
+function StatCard({
+  label,
+  value,
+  href,
+  icon: Icon,
+  tone = "primary",
+  hint,
+}: {
+  label: string;
+  value: number;
+  href?: string;
+  icon: React.ComponentType<{ className?: string }>;
+  tone?: keyof typeof STAT_TONES;
+  hint?: string;
+}) {
   const content = (
-    <div className="flex flex-col gap-1 rounded-lg border border-border bg-card p-4">
-      <span className="text-2xl font-semibold">{value}</span>
-      <span className="text-xs text-muted-foreground">{label}</span>
+    <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-muted-foreground">{label}</span>
+        <Icon className={cn("size-4", STAT_TONES[tone])} />
+      </div>
+      <span className={cn("text-2xl font-bold", STAT_TONES[tone])}>{value}</span>
+      {hint ? <span className="text-[11px] text-muted-foreground">{hint}</span> : null}
     </div>
   );
-  return href ? <Link href={href} className="transition-colors hover:border-ring">{content}</Link> : content;
+  return href ? (
+    <Link href={href} className="transition-transform hover:-translate-y-0.5">
+      {content}
+    </Link>
+  ) : (
+    content
+  );
 }
 
 export function OwnerDashboardSection() {
@@ -38,6 +84,7 @@ export function OwnerDashboardSection() {
 export function OwnerDashboardSkeleton() {
   return (
     <div className="flex flex-col gap-8">
+      <Skeleton className="h-24 w-full" />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Skeleton className="h-20" />
         <Skeleton className="h-20" />
@@ -51,6 +98,7 @@ export function OwnerDashboardSkeleton() {
 
 function OwnerDashboardContent() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { data } = useSuspenseQuery(orpc.dashboard.getStats.queryOptions({}));
   const notifQuery = useQuery(orpc.notifications.listMine.queryOptions({ input: { page: 1, limit: 5 } }));
 
@@ -67,11 +115,60 @@ function OwnerDashboardContent() {
 
   return (
     <div className="flex flex-col gap-8">
+      <div className="flex flex-col justify-between gap-4 rounded-3xl border border-border bg-card p-6 shadow-sm md:flex-row md:items-center">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="gap-1 border-primary/30 bg-primary/5 text-primary">
+              <StoreIcon className="size-3" /> My business
+            </Badge>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{user.fullName}</h1>
+          <p className="text-xs text-muted-foreground">{user.email}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/business/instruments/new" className={buttonVariants({ size: "sm" })}>
+            <PlusIcon />
+            Register instrument
+          </Link>
+          <Link href="/verify" className={buttonVariants({ variant: "outline", size: "sm" })}>
+            <QrCodeIcon className="text-primary" />
+            Verify a certificate
+          </Link>
+        </div>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Instruments" value={owner ? totalOf(owner.instrumentsByStatus) : 0} href="/business/instruments" />
-        <StatCard label="Certificates" value={owner ? totalOf(owner.certificatesByStatus) : 0} href="/business/certificates" />
-        <StatCard label="Applications" value={owner ? totalOf(owner.applicationsByStatus) : 0} href="/business/applications" />
-        <StatCard label="Upcoming appointments" value={owner?.upcomingAppointments.length ?? 0} />
+        <StatCard
+          label="Instruments"
+          value={owner ? totalOf(owner.instrumentsByStatus) : 0}
+          href="/business/instruments"
+          icon={ScaleIcon}
+          tone="primary"
+          hint="Registered to your business"
+        />
+        <StatCard
+          label="Certificates"
+          value={owner ? totalOf(owner.certificatesByStatus) : 0}
+          href="/business/certificates"
+          icon={FileCheck2Icon}
+          tone="emerald"
+          hint="Issued across all instruments"
+        />
+        <StatCard
+          label="Applications"
+          value={owner ? totalOf(owner.applicationsByStatus) : 0}
+          href="/business/applications"
+          icon={ClipboardListIcon}
+          tone="blue"
+          hint="Verification requests"
+        />
+        <StatCard
+          label="Appointments"
+          value={owner?.upcomingAppointments.length ?? 0}
+          icon={CalendarClockIcon}
+          tone="amber"
+          hint="Scheduled inspections"
+        />
       </div>
 
       <section className="flex flex-col gap-2">
@@ -90,14 +187,17 @@ function OwnerDashboardContent() {
       </section>
 
       {needsReverification && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
-          <div>
-            <p className="text-sm font-medium">Certificates need attention</p>
-            <p className="text-xs text-muted-foreground">
-              {expiring} expiring soon, {expired} expired. Apply for re-verification to stay compliant.
-            </p>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+          <div className="flex items-start gap-3">
+            <TriangleAlertIcon className="mt-0.5 size-5 shrink-0 text-amber-600" />
+            <div>
+              <p className="text-sm font-medium">Certificates need attention</p>
+              <p className="text-xs text-muted-foreground">
+                {expiring} expiring soon, {expired} expired. Apply for re-verification to stay compliant.
+              </p>
+            </div>
           </div>
-          <Link href="/business/applications/new?type=RE_VERIFICATION" className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/80">
+          <Link href="/business/applications/new?type=RE_VERIFICATION" className={buttonVariants({ size: "sm" })}>
             Apply for re-verification
           </Link>
         </div>
@@ -144,12 +244,7 @@ function OwnerDashboardContent() {
                   <p className="text-muted-foreground">{appt.instrumentCode}</p>
                   {appt.scheduledStartAt && (
                     <p className="text-xs text-muted-foreground">
-                      {new Date(appt.scheduledStartAt).toLocaleString("en-IN", {
-                        day: "numeric",
-                        month: "short",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
+                      {formatDateTime(appt.scheduledStartAt)}
                     </p>
                   )}
                 </div>

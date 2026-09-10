@@ -11,6 +11,7 @@ import {
   UsersIcon,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 
 const FEATURES = [
@@ -85,6 +86,7 @@ export default function LandingPage() {
             <Link href="/verify" className="rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground">
               Verify
             </Link>
+            <ThemeToggle />
             <Link
               href="/login"
               className={cn(buttonVariants({ variant: "outline", size: "sm" }), "hidden sm:inline-flex")}

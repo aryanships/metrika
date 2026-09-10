@@ -10,7 +10,8 @@
     "lint": "eslint",
     "test": "bun test",
     "contract:emit": "prisma contract emit",
-    "db:seed": "bun run prisma/seed.ts"
+    "db:seed": "bun run prisma/seed.ts",
+    "r2:cors": "bun run scripts/configure-r2-cors.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

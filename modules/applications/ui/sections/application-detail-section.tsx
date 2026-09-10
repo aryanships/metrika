@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useMutation, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
 import { formatDateTime } from "@/lib/format";
@@ -10,8 +10,10 @@ import { QueryErrorBoundary } from "@/components/query-error-boundary";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { AttachmentList } from "@/components/attachment-list";
+import { FileUpload } from "@/components/file-upload";
 import { ApplicationStatusBadge } from "../components/application-status-badge";
 import type { ApplicationStatus } from "../../schema";
+import type { AttachmentKind, AttachmentOutput } from "@/modules/files/schema";
 
 const EDITABLE_STATUSES: ApplicationStatus[] = ["DRAFT", "DOCUMENTS_REQUIRED"];
 const CANCELLABLE_STATUSES: ApplicationStatus[] = ["DRAFT", "SUBMITTED", "DOCUMENTS_REQUIRED"];
@@ -51,11 +53,20 @@ function ApplicationDetailContent({ id }: { id: string }) {
   const queryClient = useQueryClient();
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [cancelled, setCancelled] = useState(false);
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
 
   const { data } = useSuspenseQuery(orpc.applications.detail.queryOptions({ input: { id } }));
+
+  const attachmentsQuery = useQuery(
+    orpc.files.listAttachments.queryOptions({ input: { instrumentId: data.application.instrumentId } }),
+  );
+  const attachmentsByKind = (attachmentsQuery.data ?? []).reduce<Record<string, AttachmentOutput>>((acc, att) => {
+    acc[att.kind] = att;
+    return acc;
+  }, {});
 
   const submit = useMutation(
     orpc.applications.submit.mutationOptions({
@@ -64,7 +75,11 @@ function ApplicationDetailContent({ id }: { id: string }) {
   );
   const cancel = useMutation(
     orpc.applications.cancel.mutationOptions({
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.applications.key() }),
+      onSuccess: () => {
+        setCancelled(true);
+        setCancelOpen(false);
+        queryClient.invalidateQueries({ queryKey: orpc.applications.key() });
+      },
     }),
   );
   const updateDraft = useMutation(
@@ -79,6 +94,11 @@ function ApplicationDetailContent({ id }: { id: string }) {
   const cancellable = CANCELLABLE_STATUSES.includes(status);
   const latestReason = [...statusHistory].reverse().find((h) => h.reason)?.reason;
 
+  const needsPreviousCert = ["RE_VERIFICATION", "POST_REPAIR_VERIFICATION", "RELOCATION_RE_VERIFICATION"].includes(application.type);
+  const documentKind: { kind: AttachmentKind; label: string } = needsPreviousCert
+    ? { kind: "PREVIOUS_CERTIFICATE", label: "Previous certificate" }
+    : { kind: "PURCHASE_DOCUMENT", label: "Purchase document" };
+
   async function onAction(fn: () => Promise<unknown>) {
     setActionError(null);
     try {
@@ -86,6 +106,11 @@ function ApplicationDetailContent({ id }: { id: string }) {
     } catch (err) {
       setActionError(describeError(err));
     }
+  }
+
+  function refreshEvidence() {
+    queryClient.invalidateQueries({ queryKey: orpc.files.key() });
+    queryClient.invalidateQueries({ queryKey: orpc.applications.key() });
   }
 
   return (
@@ -170,10 +195,51 @@ function ApplicationDetailContent({ id }: { id: string }) {
         )}
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold">Attachments & evidence</h2>
-        <AttachmentList target={{ applicationId: id }} emptyTitle="No files uploaded" />
-      </section>
+      {editable ? (
+        <section className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
+          <div>
+            <h2 className="text-sm font-semibold">Supporting Evidence</h2>
+            <p className="text-xs text-muted-foreground">
+              Upload a photo or document to complete the checklist. {needsPreviousCert
+                ? "Include the previous certificate for re-verification."
+                : "A purchase document or instrument photo is sufficient."}
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FileUpload
+              kind="INSTRUMENT_FRONT"
+              target={{ instrumentId: application.instrumentId }}
+              accept="image/*"
+              capture="environment"
+              label="Instrument photo"
+              value={attachmentsByKind["INSTRUMENT_FRONT"]}
+              onUploaded={refreshEvidence}
+              onRemoved={refreshEvidence}
+            />
+            <FileUpload
+              kind={documentKind.kind}
+              target={{ instrumentId: application.instrumentId }}
+              accept="application/pdf,image/*"
+              label={documentKind.label}
+              value={attachmentsByKind[documentKind.kind]}
+              onUploaded={refreshEvidence}
+              onRemoved={refreshEvidence}
+            />
+          </div>
+          <div className="mt-2">
+            <AttachmentList
+              target={{ instrumentId: application.instrumentId }}
+              excludeKinds={["INSTRUMENT_FRONT", documentKind.kind]}
+              emptyTitle={null}
+            />
+          </div>
+        </section>
+      ) : (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold">Attachments & evidence</h2>
+          <AttachmentList target={{ instrumentId: application.instrumentId }} emptyTitle="No files uploaded" />
+        </section>
+      )}
 
       {editable && (
         <section className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
@@ -219,7 +285,7 @@ function ApplicationDetailContent({ id }: { id: string }) {
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        {editable && (
+        {editable && completeness.complete && (
           <Button
             disabled={submit.isPending}
             onClick={() => onAction(() => submit.mutateAsync({ id }))}
@@ -228,7 +294,13 @@ function ApplicationDetailContent({ id }: { id: string }) {
           </Button>
         )}
 
-        {cancellable && !cancelOpen && (
+        {editable && !completeness.complete && (
+          <p className="text-sm text-muted-foreground">
+            Complete the checklist above before submitting.
+          </p>
+        )}
+
+        {cancellable && !cancelled && !cancelOpen && (
           <Button variant="outline" onClick={() => setCancelOpen(true)}>
             Cancel application
           </Button>

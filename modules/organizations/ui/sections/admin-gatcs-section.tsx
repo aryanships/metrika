@@ -93,7 +93,7 @@ function AdminGatcsContent() {
   const [serviceAreas, setServiceAreas] = useState<string[]>([]);
   const [staff, setStaff] = useState(EMPTY_STAFF);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<React.ReactNode | null>(null);
 
   const { data } = useSuspenseQuery(
     orpc.organizations.listGatcs.queryOptions({ input: { page: 1, limit: 200, activeOnly: false } }),
@@ -152,11 +152,21 @@ function AdminGatcsContent() {
         phone: staff.phone || undefined,
         role: staff.role,
       });
-      setNotice(
-        result.invitationToken
-          ? `Staff invited. One-time invitation token: ${result.invitationToken}`
-          : "Staff invited (existing user re-invited).",
-      );
+      if (result.invitationToken) {
+        setNotice(
+          <>
+            Staff invited for {staff.email}. Share this invitation link:{" "}
+            <a
+              className="break-all font-mono underline"
+              href={`/accept-invitation?email=${encodeURIComponent(staff.email)}&token=${encodeURIComponent(result.invitationToken)}`}
+            >
+              Accept invitation
+            </a>
+          </>,
+        );
+      } else {
+        setNotice("Staff invited (existing user re-invited).");
+      }
       setStaff(EMPTY_STAFF);
     } catch (err) {
       setError(describeError(err));

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
+import { toIsoDateTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -58,8 +59,8 @@ export function ApplicationNewSection({
         instrumentId,
         type,
         targetCertificateId: targetCertificateId || undefined,
-        preferredStartAt: preferredStartAt || undefined,
-        preferredEndAt: preferredEndAt || undefined,
+        preferredStartAt: toIsoDateTime(preferredStartAt),
+        preferredEndAt: toIsoDateTime(preferredEndAt),
       });
       router.push(`/business/applications/${created.id}`);
       router.refresh();

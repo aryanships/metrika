@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { QrScannerModal } from "@/components/qr-scanner-modal";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const EXAMPLES = [
   { code: "CERT-2026-0008", label: "Active", tone: "emerald" },
@@ -33,6 +34,9 @@ export default function VerifySearchPage() {
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-6 px-4 py-10">
+      <div className="fixed right-4 top-4">
+        <ThemeToggle />
+      </div>
       <Link href="/" className="text-sm font-semibold">
         Digital Metrology
       </Link>

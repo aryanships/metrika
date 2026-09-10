@@ -25,6 +25,11 @@ async function findCertificate(query: string): Promise<CertificateRow | null> {
     .first();
 }
 
+function toIso(val: string): string {
+  const d = new Date(val);
+  return Number.isNaN(d.getTime()) ? val : d.toISOString();
+}
+
 export const verificationService = {
   async verifyCertificate(
     input: VerifyCertificateInput,
@@ -46,6 +51,10 @@ export const verificationService = {
     const now = Date.now();
     const active = certificate.status === "ACTIVE" || certificate.status === "EXPIRING_SOON";
     const valid = active && Date.parse(certificate.validUntil) > now;
+
+    const history = await db.orm.public.Certificate.where({ instrumentId: certificate.instrumentId })
+      .orderBy((c) => c.verifiedAt.desc())
+      .all();
 
     // Recompute the canonical payload hash from live fields to detect tampering
     // (best-effort prototype integrity, not a qualified signature).
@@ -70,8 +79,8 @@ export const verificationService = {
         businessName: business?.businessName ?? "",
         result: "PASS",
         ruleReference: rule?.id ?? "",
-        verifiedAt: certificate.verifiedAt,
-        validUntil: certificate.validUntil,
+        verifiedAt: toIso(certificate.verifiedAt),
+        validUntil: toIso(certificate.validUntil),
         issuingAuthority,
       }),
     );
@@ -105,6 +114,12 @@ export const verificationService = {
         isHashVerified: !tamperDetected,
         tamperDetected,
       },
+      history: history.map((h) => ({
+        certificateCode: h.certificateCode,
+        verifiedAt: h.verifiedAt,
+        validUntil: h.validUntil,
+        status: h.status,
+      })),
       verificationTimestamp: new Date().toISOString(),
     };
   },

@@ -520,7 +520,7 @@ export const applicationsService = {
         data: {
           issues: completeness.checks
             .filter((c) => !c.passed)
-            .map((c) => ({ path: "application", message: c.label })),
+            .map((c) => ({ path: "application", message: `Missing: ${c.label}` })),
         },
       });
     }

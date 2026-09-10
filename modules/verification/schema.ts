@@ -6,6 +6,14 @@ export const VerifyCertificateInputSchema = z.object({
 export type VerifyCertificateInput = z.infer<typeof VerifyCertificateInputSchema>;
 
 // SECURITY: strictly safe public payload — no owner phone, email, address, or documents.
+export const PublicVerificationHistorySchema = z.object({
+  certificateCode: z.string(),
+  verifiedAt: z.string(),
+  validUntil: z.string(),
+  status: z.string(),
+});
+export type PublicVerificationHistory = z.infer<typeof PublicVerificationHistorySchema>;
+
 export const PublicVerificationOutputSchema = z.object({
   valid: z.boolean(),
   certificateCode: z.string(),
@@ -27,6 +35,7 @@ export const PublicVerificationOutputSchema = z.object({
     isHashVerified: z.boolean(),
     tamperDetected: z.boolean(),
   }),
+  history: z.array(PublicVerificationHistorySchema),
   verificationTimestamp: z.string(),
 });
 export type PublicVerificationOutput = z.infer<typeof PublicVerificationOutputSchema>;

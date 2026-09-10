@@ -92,7 +92,7 @@ function AdminLmosContent() {
   const [expertise, setExpertise] = useState<string[]>([]);
   const [jurisdictions, setJurisdictions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [invitation, setInvitation] = useState<string | null>(null);
+  const [invitation, setInvitation] = useState<{ email: string; token: string } | null>(null);
 
   const { data } = useSuspenseQuery(
     orpc.organizations.listLmos.queryOptions({ input: { page: 1, limit: 200, activeOnly: false } }),
@@ -130,7 +130,7 @@ function AdminLmosContent() {
         expertiseTypeIds: expertise,
         jurisdictionIds: jurisdictions,
       });
-      setInvitation(created.invitationToken);
+      setInvitation(created.invitationToken ? { email: created.email, token: created.invitationToken } : null);
       setForm(EMPTY);
       setExpertise([]);
       setJurisdictions([]);
@@ -144,8 +144,13 @@ function AdminLmosContent() {
       {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
       {invitation && (
         <div className="rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400">
-          <p className="font-medium">LMO provisioned. Share this one-time invitation token:</p>
-          <p className="mt-1 break-all font-mono">{invitation}</p>
+          <p className="font-medium">LMO provisioned for {invitation.email}. Share this invitation link:</p>
+          <a
+            className="mt-1 block break-all font-mono underline"
+            href={`/accept-invitation?email=${encodeURIComponent(invitation.email)}&token=${encodeURIComponent(invitation.token)}`}
+          >
+            Accept invitation
+          </a>
         </div>
       )}
 

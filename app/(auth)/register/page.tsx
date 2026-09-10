@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 // Mirrors modules/auth RegisterOwnerInputSchema but allows an empty phone field.
 const RegisterFormSchema = z.object({
@@ -60,6 +61,9 @@ export default function RegisterPage() {
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-6 px-4 py-10">
+      <div className="fixed right-4 top-4">
+        <ThemeToggle />
+      </div>
       <Link href="/" className="text-sm font-semibold">
         Digital Metrology
       </Link>

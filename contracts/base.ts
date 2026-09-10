@@ -1,6 +1,7 @@
 import { oc } from "@orpc/contract";
 import "@orpc/openapi";
 import "@orpc/openapi/extensions/route";
+import { COMMON_ERROR_STATUS_MAP } from "@orpc/server";
 import { z } from "zod";
 
 /**
@@ -63,3 +64,18 @@ export const base = oc.errors({
     }),
   },
 });
+
+/**
+ * Maps error codes to their HTTP status. Handlers must pass this to
+ * `RPCHandler`/`OpenAPIHandler` via the `errorStatusMap` option, otherwise
+ * custom codes fall back to 500.
+ *
+ * NOTE: `errorStatusMap` *replaces* oRPC's built-in `COMMON_ERROR_STATUS_MAP`
+ * rather than merging with it, so we must spread the common map here or codes
+ * like FORBIDDEN/UNAUTHORIZED/NOT_FOUND/CONFLICT would be serialized as 500.
+ */
+export const errorStatusMap: Record<string, number> = {
+  ...COMMON_ERROR_STATUS_MAP,
+  VALIDATION_ERROR: 422,
+  INVALID_STATE: 409,
+};

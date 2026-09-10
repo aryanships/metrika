@@ -7,7 +7,7 @@ import { describeError } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { FileUpload } from "@/components/file-upload";
 import type { InspectionOutput, ObservationSeverity } from "../../schema";
-import type { AttachmentKind } from "@/modules/files/schema";
+import type { AttachmentKind, AttachmentOutput } from "@/modules/files/schema";
 
 const inputClass =
   "flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30";
@@ -129,6 +129,14 @@ function InspectionForm({ inspection, applicationId }: { inspection: InspectionO
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [summary, setSummary] = useState<InspectionOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const attachmentsQuery = useQuery(
+    orpc.files.listAttachments.queryOptions({ input: { inspectionId: inspection.id } }),
+  );
+  const attachmentsByKind = (attachmentsQuery.data ?? []).reduce<Record<string, AttachmentOutput>>((acc, att) => {
+    acc[att.kind] = att;
+    return acc;
+  }, {});
 
   const saveDraft = useMutation(orpc.inspections.saveDraft.mutationOptions());
   const submit = useMutation(
@@ -362,7 +370,15 @@ function InspectionForm({ inspection, applicationId }: { inspection: InspectionO
               accept="image/*"
               capture="environment"
               label={label}
-              onUploaded={() => queryClient.invalidateQueries({ queryKey: orpc.inspections.key() })}
+              value={attachmentsByKind[kind]}
+              onUploaded={() => {
+                queryClient.invalidateQueries({ queryKey: orpc.inspections.key() });
+                queryClient.invalidateQueries({ queryKey: orpc.files.key() });
+              }}
+              onRemoved={() => {
+                queryClient.invalidateQueries({ queryKey: orpc.inspections.key() });
+                queryClient.invalidateQueries({ queryKey: orpc.files.key() });
+              }}
             />
           ))}
           <FileUpload
@@ -370,7 +386,15 @@ function InspectionForm({ inspection, applicationId }: { inspection: InspectionO
             target={{ inspectionId: inspection.id }}
             accept="video/*"
             label="Inspection video (optional)"
-            onUploaded={() => queryClient.invalidateQueries({ queryKey: orpc.inspections.key() })}
+            value={attachmentsByKind["INSPECTION_VIDEO"]}
+            onUploaded={() => {
+              queryClient.invalidateQueries({ queryKey: orpc.inspections.key() });
+              queryClient.invalidateQueries({ queryKey: orpc.files.key() });
+            }}
+            onRemoved={() => {
+              queryClient.invalidateQueries({ queryKey: orpc.inspections.key() });
+              queryClient.invalidateQueries({ queryKey: orpc.files.key() });
+            }}
           />
         </div>
       </section>

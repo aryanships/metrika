@@ -2,11 +2,12 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { formatDate } from "@/lib/format";
 import { QueryErrorBoundary } from "@/components/query-error-boundary";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FileUpload } from "@/components/file-upload";
 import { InstrumentStatusBadge } from "../components/instrument-status-badge";
 import { CertificateStatusBadge } from "@/modules/certificates/ui/components/certificate-status-badge";
 import { ApplicationStatusBadge } from "@/modules/applications/ui/components/application-status-badge";
@@ -14,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AttachmentList } from "@/components/attachment-list";
 import type { CertificateStatus } from "@/modules/certificates/schema";
 import type { ApplicationStatus } from "@/modules/applications/schema";
+import type { AttachmentOutput } from "@/modules/files/schema";
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -23,6 +25,16 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
     </div>
   );
 }
+
+const PHOTO_KINDS = [
+  { kind: "INSTRUMENT_FRONT", label: "Instrument front" },
+  { kind: "NAMEPLATE", label: "Nameplate / rating label" },
+  { kind: "SERIAL_NUMBER", label: "Serial number" },
+] as const;
+
+const DOCUMENT_KINDS = [
+  { kind: "PURCHASE_DOCUMENT", label: "Purchase document" },
+] as const;
 
 export function InstrumentDetailSection({ id }: { id: string }) {
   return (
@@ -47,9 +59,20 @@ export function InstrumentDetailSkeleton() {
 }
 
 function InstrumentDetailContent({ id }: { id: string }) {
+  const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(orpc.instruments.passport.queryOptions({ input: { id } }));
 
   const { instrument, certificates, applications } = data;
+
+  const attachmentsQuery = useQuery(orpc.files.listAttachments.queryOptions({ input: { instrumentId: id } }));
+  const attachmentsByKind = (attachmentsQuery.data ?? []).reduce<Record<string, AttachmentOutput>>((acc, att) => {
+    acc[att.kind] = att;
+    return acc;
+  }, {});
+
+  function invalidateFiles() {
+    queryClient.invalidateQueries({ queryKey: orpc.files.key() });
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -147,11 +170,54 @@ function InstrumentDetailContent({ id }: { id: string }) {
         </TabsContent>
 
         <TabsContent value="documents" className="pt-4">
-          <AttachmentList target={{ instrumentId: id }} emptyTitle="No documents uploaded" />
+          <div className="grid gap-3 sm:grid-cols-2">
+            {DOCUMENT_KINDS.map(({ kind, label }) => (
+              <FileUpload
+                key={kind}
+                kind={kind}
+                target={{ instrumentId: id }}
+                accept="application/pdf,image/*"
+                label={label}
+                value={attachmentsByKind[kind]}
+                onUploaded={invalidateFiles}
+                onRemoved={invalidateFiles}
+              />
+            ))}
+          </div>
+          <div className="mt-4">
+            <AttachmentList
+              target={{ instrumentId: id }}
+              documentsOnly
+              excludeKinds={DOCUMENT_KINDS.map((d) => d.kind)}
+              emptyTitle={null}
+            />
+          </div>
         </TabsContent>
 
         <TabsContent value="photos" className="pt-4">
-          <AttachmentList target={{ instrumentId: id }} photosOnly emptyTitle="No photos uploaded" />
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {PHOTO_KINDS.map(({ kind, label }) => (
+              <FileUpload
+                key={kind}
+                kind={kind}
+                target={{ instrumentId: id }}
+                accept="image/*"
+                capture="environment"
+                label={label}
+                value={attachmentsByKind[kind]}
+                onUploaded={invalidateFiles}
+                onRemoved={invalidateFiles}
+              />
+            ))}
+          </div>
+          <div className="mt-4">
+            <AttachmentList
+              target={{ instrumentId: id }}
+              photosOnly
+              excludeKinds={PHOTO_KINDS.map((p) => p.kind)}
+              emptyTitle={null}
+            />
+          </div>
         </TabsContent>
       </Tabs>
     </div>
