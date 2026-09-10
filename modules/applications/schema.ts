@@ -167,6 +167,10 @@ export const ApplicationInstrumentSchema = z.object({
   status: z.string(),
   address: z.string(),
   administrativeUnitName: z.string(),
+  stateName: z.string().nullable(),
+  districtName: z.string().nullable(),
+  tehsilName: z.string().nullable(),
+  villageName: z.string().nullable(),
 });
 export type ApplicationInstrument = z.infer<typeof ApplicationInstrumentSchema>;
 
@@ -180,6 +184,7 @@ export const ApplicationDetailOutputSchema = z.object({
     scheduledStartAt: z.string().nullable(),
     scheduledEndAt: z.string().nullable(),
     location: z.string().nullable(),
+    assigneeName: z.string().nullable(),
   }),
   priorCertificates: z.array(
     z.object({

@@ -11,6 +11,38 @@ export async function ancestorUnitIds(unitId: string): Promise<Set<string>> {
   return ids;
 }
 
+export interface UnitPath {
+  state: string | null;
+  district: string | null;
+  tehsil: string | null;
+  village: string | null;
+}
+
+/** Resolves the full administrative path (state → district → tehsil → village)
+ *  for a unit, walking parent links upward. Missing levels are null. */
+export async function unitPathNames(unitId: string): Promise<UnitPath> {
+  const path: UnitPath = { state: null, district: null, tehsil: null, village: null };
+  let unit = await db.orm.public.AdministrativeUnit.first({ id: unitId });
+  while (unit) {
+    switch (unit.type) {
+      case "STATE":
+        path.state = unit.name;
+        break;
+      case "DISTRICT":
+        path.district = unit.name;
+        break;
+      case "TEHSIL":
+        path.tehsil = unit.name;
+        break;
+      case "VILLAGE":
+        path.village = unit.name;
+        break;
+    }
+    unit = unit.parentId ? await db.orm.public.AdministrativeUnit.first({ id: unit.parentId }) : null;
+  }
+  return path;
+}
+
 /** Every descendant of the given roots (including the roots themselves). */
 export async function descendantUnitIds(rootIds: string[]): Promise<Set<string>> {
   const result = new Set<string>();

@@ -3,7 +3,8 @@ import { ORPCError } from "@orpc/server";
 import { db } from "@/prisma/db";
 import { paginationMeta } from "@/schemas/shared";
 import { requireStateScope } from "@/middleware/require-state-scope";
-import { descendantUnitIds } from "@/lib/geo";
+import { descendantUnitIds, unitPathNames } from "@/lib/geo";
+import { resolveAssigneeName } from "@/lib/assignee";
 import { notifyAdminsForUnit, notifyBusinessOwner } from "@/lib/notify";
 import type { AppUser } from "@/middleware/context";
 import type { UserRole } from "@/modules/auth/schema";
@@ -384,7 +385,7 @@ export const applicationsService = {
     await assertCanView(user, application);
 
     const instrument = await loadInstrumentFor(application);
-    const [output, statusHistory, completeness, type, unit, business, workOrder, certificates] = await Promise.all([
+    const [output, statusHistory, completeness, type, unit, path, business, workOrder, certificates] = await Promise.all([
       this.fetchOutput(input.id),
       db.orm.public.ApplicationStatusHistory.where({ applicationId: input.id })
         .orderBy((h) => h.createdAt.asc())
@@ -392,6 +393,7 @@ export const applicationsService = {
       evaluateCompleteness(input.id),
       db.orm.public.InstrumentType.first({ id: instrument.instrumentTypeId }),
       db.orm.public.AdministrativeUnit.first({ id: instrument.administrativeUnitId }),
+      unitPathNames(instrument.administrativeUnitId),
       db.orm.public.Business.first({ id: instrument.businessId }),
       db.orm.public.WorkOrder.where({ applicationId: input.id }).first(),
       db.orm.public.Certificate.where({ instrumentId: instrument.id })
@@ -414,6 +416,10 @@ export const applicationsService = {
         status: instrument.status,
         address: instrument.address,
         administrativeUnitName: unit?.name ?? "",
+        stateName: path.state,
+        districtName: path.district,
+        tehsilName: path.tehsil,
+        villageName: path.village,
       },
       businessName: business?.businessName ?? "",
       contactPhone: business?.contactPhone ?? null,
@@ -422,6 +428,9 @@ export const applicationsService = {
         scheduledStartAt: workOrder?.scheduledStartAt ?? null,
         scheduledEndAt: workOrder?.scheduledEndAt ?? null,
         location: workOrder?.location ?? null,
+        assigneeName: workOrder
+          ? await resolveAssigneeName(workOrder.route, workOrder.lmoId, workOrder.gatcId)
+          : null,
       },
       priorCertificates: certificates.map((c) => ({
         id: c.id,

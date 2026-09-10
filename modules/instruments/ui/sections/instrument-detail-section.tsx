@@ -104,8 +104,11 @@ function InstrumentDetailContent({ id }: { id: string }) {
             <Row label="Accuracy class" value={instrument.accuracyClass} />
             <Row label="Year of manufacture" value={instrument.yearOfManufacture} />
             <Row label="Purchase date" value={instrument.purchaseDate ? formatDate(instrument.purchaseDate) : null} />
-            <Row label="Location" value={instrument.address} />
-            <Row label="Administrative unit" value={instrument.administrativeUnitName} />
+            <Row label="Installed address" value={instrument.address} />
+            <Row label="State" value={instrument.stateName} />
+            <Row label="District" value={instrument.districtName} />
+            <Row label="Tehsil" value={instrument.tehsilName} />
+            <Row label="Village / Town" value={instrument.villageName} />
             <Row label="Postal code" value={instrument.postalCode} />
           </dl>
           {data.activeCertificate && (

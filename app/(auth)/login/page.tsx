@@ -17,11 +17,14 @@ import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const DEMO_LOGINS = [
-  { label: "Merchant", icon: "🏪", email: "owner.reliance@retail.in" },
-  { label: "LMO Officer", icon: "⚖️", email: "lmo.sharma@metrika.gov.in" },
-  { label: "GATC Lab", icon: "🏢", email: "manager.apex@gatc.org" },
-  { label: "Authority", icon: "🏛️", email: "distadmin.pune@metrika.gov.in" },
   { label: "System Admin", icon: "🖥️", email: "admin@metrika.gov.in" },
+  { label: "Merchant (Lucknow)", icon: "🛒", email: "owner.bigbazaar@retail.in" },
+  { label: "Fuel Merchant (Lucknow)", icon: "⛽", email: "owner.iocl@petro.in" },
+  { label: "LMO (Lucknow)", icon: "⚖️", email: "lmo.verma@metrika.gov.in" },
+  { label: "LMO (Lucknow 2)", icon: "⚖️", email: "lmo.gupta@metrika.gov.in" },
+  { label: "GATC (Lucknow)", icon: "🏢", email: "manager.avadh@gatc.org" },
+  { label: "State Admin (UP)", icon: "🏛️", email: "stateadmin.up@metrika.gov.in" },
+  { label: "District Admin (Lucknow)", icon: "🏛️", email: "distadmin.lucknow@metrika.gov.in" },
 ] as const;
 
 const DEMO_PASSWORD = "Demo1234!";
@@ -121,11 +124,6 @@ export default function LoginPage() {
           </p>
         </div>
       </Card>
-
-      <p className="max-w-sm text-center text-xs text-muted-foreground">
-        Demo owner: <span className="font-mono">owner.reliance@retail.in</span> /{" "}
-        <span className="font-mono">Demo1234!</span>
-      </p>
     </main>
   );
 }

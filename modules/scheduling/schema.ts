@@ -54,6 +54,7 @@ export const WorkOrderOutputSchema = z.object({
   route: RouteTypeSchema,
   lmoId: z.string().nullable(),
   gatcId: z.string().nullable(),
+  assigneeName: z.string().nullable(),
   recommendedScore: z.string().nullable(),
   wasOverridden: z.boolean(),
   assignedById: z.string(),

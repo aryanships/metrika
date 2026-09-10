@@ -179,6 +179,48 @@ export async function main() {
     longitude: 79.0650,
   });
 
+  // 1b. Uttar Pradesh (Lucknow / Jankipuram) geography
+  console.log('📍 Seeding administrative hierarchy (Uttar Pradesh)...');
+  const upState = await getOrCreateAdminUnit({
+    name: 'Uttar Pradesh',
+    type: 'STATE',
+    parentId: null,
+    latitude: 26.8467,
+    longitude: 80.9462,
+  });
+
+  const lucknowDist = await getOrCreateAdminUnit({
+    name: 'Lucknow',
+    type: 'DISTRICT',
+    parentId: upState.id,
+    latitude: 26.8467,
+    longitude: 80.9462,
+  });
+
+  const jankipuramTehsil = await getOrCreateAdminUnit({
+    name: 'Jankipuram',
+    type: 'TEHSIL',
+    parentId: lucknowDist.id,
+    latitude: 26.9265,
+    longitude: 80.9374,
+  });
+
+  const jankipuramExtVillage = await getOrCreateAdminUnit({
+    name: 'Jankipuram Extension',
+    type: 'VILLAGE',
+    parentId: jankipuramTehsil.id,
+    latitude: 26.9295,
+    longitude: 80.9400,
+  });
+
+  const aliganjVillage = await getOrCreateAdminUnit({
+    name: 'Aliganj',
+    type: 'VILLAGE',
+    parentId: jankipuramTehsil.id,
+    latitude: 26.8892,
+    longitude: 80.9600,
+  });
+
   // 2. Instrument Types
   console.log('⚖️ Seeding instrument master types...');
   const ewbType = await getOrCreateInstrumentType({
@@ -349,6 +391,72 @@ export async function main() {
     }
   }
 
+  // Remaining instrument types get inspection templates too.
+  console.log('📋 Seeding remaining inspection templates...');
+  const extraTemplates = [
+    {
+      typeId: wbrType.id,
+      code: 'TPL-WBR-01',
+      name: 'Heavy Weighbridge Verification Inspection',
+      items: [
+        { code: 'ITEM-ZERO', label: 'Zero Load / Tare Error Check', kind: 'NUMERIC' as const, unit: 'tonne', order: 1 },
+        { code: 'ITEM-CORNER', label: 'Corner Load (Section) Test', kind: 'CHECKLIST' as const, unit: null, order: 2 },
+        { code: 'ITEM-MAXCAP', label: 'Max Capacity Indication Accuracy', kind: 'NUMERIC' as const, unit: 'tonne', order: 3 },
+        { code: 'ITEM-PLATFORM', label: 'Platform / Foundation Condition', kind: 'CHECKLIST' as const, unit: null, order: 4 },
+        { code: 'ITEM-STAMP', label: 'Verification Stamp & Plaque Intact', kind: 'CHECKLIST' as const, unit: null, order: 5 },
+      ],
+    },
+    {
+      typeId: astType.id,
+      code: 'TPL-AST-01',
+      name: 'Petroleum Storage Tank Dip Inspection',
+      items: [
+        { code: 'ITEM-DIPCHART', label: 'Strapping / Dip Chart Deviation', kind: 'MEASUREMENT' as const, unit: 'kL', order: 1 },
+        { code: 'ITEM-SHELL', label: 'Shell Integrity & Leak Check', kind: 'CHECKLIST' as const, unit: null, order: 2 },
+        { code: 'ITEM-GAUGE', label: 'Level Gauge Calibration', kind: 'NUMERIC' as const, unit: 'kL', order: 3 },
+        { code: 'ITEM-VENT', label: 'Vent & Overfill Protection', kind: 'CHECKLIST' as const, unit: null, order: 4 },
+      ],
+    },
+    {
+      typeId: pwbType.id,
+      code: 'TPL-PWB-01',
+      name: 'High Precision Balance Inspection',
+      items: [
+        { code: 'ITEM-LEVEL', label: 'Levelling & Draft Shield Check', kind: 'CHECKLIST' as const, unit: null, order: 1 },
+        { code: 'ITEM-ZERO', label: 'Zero / Tare Drift Check', kind: 'NUMERIC' as const, unit: 'g', order: 2 },
+        { code: 'ITEM-LINEARITY', label: 'Linearity Across Range', kind: 'MEASUREMENT' as const, unit: 'g', order: 3 },
+        { code: 'ITEM-REPEAT', label: 'Repeatability Test', kind: 'MEASUREMENT' as const, unit: 'g', order: 4 },
+      ],
+    },
+  ];
+
+  for (const t of extraTemplates) {
+    let template = await orm.InspectionTemplate
+      .where({ instrumentTypeId: t.typeId, code: t.code, version: 1 })
+      .first();
+    if (!template) {
+      template = await orm.InspectionTemplate.create({
+        instrumentTypeId: t.typeId,
+        code: t.code,
+        name: t.name,
+        version: 1,
+        effectiveFrom: '2023-01-01T00:00:00.000Z',
+        isActive: true,
+      });
+      for (const it of t.items) {
+        await orm.InspectionTemplateItem.create({
+          templateId: template.id,
+          code: it.code,
+          label: it.label,
+          kind: it.kind,
+          unit: it.unit,
+          isRequired: true,
+          displayOrder: it.order,
+        });
+      }
+    }
+  }
+
   // 5. Administrators & Officials
   console.log('👤 Seeding administrators and officials...');
   const sysAdmin = await getOrCreateUser({
@@ -391,6 +499,28 @@ export async function main() {
     await orm.AdminScope.create({ userId: distAdminMumbai.id, administrativeUnitId: mumbaiDist.id });
   }
 
+  const upStateAdmin = await getOrCreateUser({
+    email: 'stateadmin.up@metrika.gov.in',
+    fullName: 'Rakesh Yadav (Controller, Legal Metrology UP)',
+    phone: '+919800000006',
+    role: 'STATE_ADMIN',
+  });
+  const upStateScope = await orm.AdminScope.where({ userId: upStateAdmin.id, administrativeUnitId: upState.id }).first();
+  if (!upStateScope) {
+    await orm.AdminScope.create({ userId: upStateAdmin.id, administrativeUnitId: upState.id });
+  }
+
+  const distAdminLucknow = await getOrCreateUser({
+    email: 'distadmin.lucknow@metrika.gov.in',
+    fullName: 'Anita Srivastava (Dy. Controller Lucknow)',
+    phone: '+919800000007',
+    role: 'DISTRICT_ADMIN',
+  });
+  const lucknowScope = await orm.AdminScope.where({ userId: distAdminLucknow.id, administrativeUnitId: lucknowDist.id }).first();
+  if (!lucknowScope) {
+    await orm.AdminScope.create({ userId: distAdminLucknow.id, administrativeUnitId: lucknowDist.id });
+  }
+
   await getOrCreateUser({
     email: 'dept.hq@metrika.gov.in',
     fullName: 'National Legal Metrology Directorate Official',
@@ -398,8 +528,8 @@ export async function main() {
     role: 'DEPARTMENT_OFFICIAL',
   });
 
-  // 6. LMOs (Legal Metrology Officers - Exactly 6)
-  console.log('👮 Seeding 6 Legal Metrology Officers (LMOs)...');
+  // 6. LMOs (Legal Metrology Officers)
+  console.log('👮 Seeding Legal Metrology Officers (LMOs)...');
   const lmoSpecs = [
     { email: 'lmo.sharma@metrika.gov.in', name: 'Rajesh Sharma', empId: 'LMO-MH-001', base: puneDist.id, types: [ewbType.id, fdpType.id], juris: [puneDist.id, haveliTehsil.id] },
     { email: 'lmo.patil@metrika.gov.in', name: 'Priya Patil', empId: 'LMO-MH-002', base: puneDist.id, types: [wbrType.id, ewbType.id], juris: [puneDist.id] },
@@ -407,6 +537,8 @@ export async function main() {
     { email: 'lmo.deshmukh@metrika.gov.in', name: 'Sunita Deshmukh', empId: 'LMO-MH-004', base: mumbaiDist.id, types: [ewbType.id, pwbType.id], juris: [mumbaiDist.id] },
     { email: 'lmo.shinde@metrika.gov.in', name: 'Vikas Shinde', empId: 'LMO-MH-005', base: nagpurDist.id, types: [wbrType.id, ewbType.id], juris: [nagpurDist.id, nagpurUrbanTehsil.id] },
     { email: 'lmo.joshi@metrika.gov.in', name: 'Sneha Joshi', empId: 'LMO-MH-006', base: nagpurDist.id, types: [fdpType.id, ewbType.id], juris: [nagpurDist.id] },
+    { email: 'lmo.verma@metrika.gov.in', name: 'Naveen Verma', empId: 'LMO-UP-001', base: lucknowDist.id, types: [ewbType.id, fdpType.id], juris: [lucknowDist.id, jankipuramTehsil.id] },
+    { email: 'lmo.gupta@metrika.gov.in', name: 'Pooja Gupta', empId: 'LMO-UP-002', base: lucknowDist.id, types: [wbrType.id, ewbType.id], juris: [lucknowDist.id] },
   ];
 
   const seededLmos = [];
@@ -437,8 +569,8 @@ export async function main() {
     seededLmos.push({ user, lmo });
   }
 
-  // 7. GATCs (Govt Approved Test Centres - Exactly 3)
-  console.log('🏢 Seeding 3 Govt Approved Test Centres (GATCs)...');
+  // 7. GATCs (Govt Approved Test Centres)
+  console.log('🏢 Seeding Govt Approved Test Centres (GATCs)...');
   const gatcSpecs = [
     {
       approval: 'GATC-MH-PUN-001',
@@ -475,6 +607,18 @@ export async function main() {
       mgrName: 'Manoj Tiwari',
       opEmail: 'operator.vvc@gatc.org',
       opName: 'Pooja Mishra',
+    },
+    {
+      approval: 'GATC-UP-LKO-001',
+      name: 'Avadh Metrology & Testing Centre',
+      dist: lucknowDist.id,
+      address: 'Plot 8, Sector 25, Jankipuram, Lucknow',
+      types: [ewbType.id, wbrType.id],
+      serviceAreas: [lucknowDist.id],
+      mgrEmail: 'manager.avadh@gatc.org',
+      mgrName: 'Kamal Rastogi',
+      opEmail: 'operator.avadh@gatc.org',
+      opName: 'Divya Singh',
     },
   ];
 
@@ -524,8 +668,8 @@ export async function main() {
     seededGatcs.push(gatc);
   }
 
-  // 8. Businesses (Exactly 5 Business Profiles & Owners)
-  console.log('🏪 Seeding 5 Business Profiles & Owners...');
+  // 8. Businesses (Business Profiles & Owners)
+  console.log('🏪 Seeding Business Profiles & Owners...');
   const businessSpecs = [
     {
       email: 'owner.reliance@retail.in',
@@ -571,6 +715,24 @@ export async function main() {
       phone: '+919811122205',
       unitId: dharampethVillage.id,
       address: 'APMC Market Yard, Dharampeth, Nagpur',
+    },
+    {
+      email: 'owner.bigbazaar@retail.in',
+      ownerName: 'Rohit Mehra',
+      businessName: 'Big Bazaar Jankipuram',
+      regNo: 'GSTIN09AAACB1234F1Z1',
+      phone: '+919811122206',
+      unitId: jankipuramExtVillage.id,
+      address: 'Shop 21-24, Sahara Mall, Jankipuram Extension, Lucknow',
+    },
+    {
+      email: 'owner.iocl@petro.in',
+      ownerName: 'Vikram Singh',
+      businessName: 'IOCL Fuel Station Aliganj',
+      regNo: 'GSTIN09AABCI5678G2Z2',
+      phone: '+919811122207',
+      unitId: aliganjVillage.id,
+      address: 'Sitapur Road, Aliganj, Lucknow',
     },
   ];
 
@@ -628,6 +790,16 @@ export async function main() {
     { bIdx: 4, code: 'DMI-EWB-018', typeId: ewbType.id, mfr: 'Eagle Scales', model: 'Platform 500', serial: 'EAG-2024-702', cap: '500.0', cls: 'Class III', stat: 'VERIFIED' as const },
     { bIdx: 4, code: 'DMI-WBR-019', typeId: wbrType.id, mfr: 'Tulsi Scales', model: 'Pitless 50T', serial: 'TLS-2024-501', cap: '50.0', cls: 'Class III', stat: 'PENDING_VERIFICATION' as const },
     { bIdx: 4, code: 'DMI-EWB-020', typeId: ewbType.id, mfr: 'Tulsi Scales', model: 'TableTop 30', serial: 'TLS-2024-301', cap: '30.0', cls: 'Class III', stat: 'REGISTERED' as const },
+
+    // Big Bazaar Jankipuram (3 instruments)
+    { bIdx: 5, code: 'DMI-EWB-021', typeId: ewbType.id, mfr: 'Mettler Toledo', model: 'bPlus-T', serial: 'MT-2024-021', cap: '15.0', cls: 'Class III', stat: 'VERIFIED' as const },
+    { bIdx: 5, code: 'DMI-EWB-022', typeId: ewbType.id, mfr: 'Essae-Teraoka', model: 'DS-215', serial: 'ES-2024-102', cap: '30.0', cls: 'Class III', stat: 'PENDING_VERIFICATION' as const },
+    { bIdx: 5, code: 'DMI-EWB-023', typeId: ewbType.id, mfr: 'Essae-Teraoka', model: 'DS-215', serial: 'ES-2024-103', cap: '30.0', cls: 'Class III', stat: 'REGISTERED' as const },
+
+    // IOCL Fuel Station Aliganj (3 instruments)
+    { bIdx: 6, code: 'DMI-FDP-024', typeId: fdpType.id, mfr: 'Gilbarco Veeder-Root', model: 'Frontier EU', serial: 'GVR-2024-503', cap: '50.0', cls: 'Class 0.5', stat: 'VERIFIED' as const },
+    { bIdx: 6, code: 'DMI-FDP-025', typeId: fdpType.id, mfr: 'Tatsuno India', model: 'Ultra Dispense', serial: 'TAT-2024-883', cap: '50.0', cls: 'Class 0.5', stat: 'PENDING_VERIFICATION' as const },
+    { bIdx: 6, code: 'DMI-AST-026', typeId: astType.id, mfr: 'Tatsuno India', model: 'Ultra Dispense', serial: 'TAT-2023-772', cap: '20000.0', cls: 'Class 0.2', stat: 'EXPIRING_SOON' as const },
   ];
 
   const seededInstruments: NonNullable<Awaited<ReturnType<typeof orm.Instrument["first"]>>>[] = [];
@@ -878,6 +1050,53 @@ export async function main() {
       }
     }
 
+  // 10b. Lucknow (UP) sample applications: one SCHEDULED so the merchant
+  //      dashboard shows the schedule, one SUBMITTED.
+  console.log('📝 Seeding Lucknow sample applications...');
+  const upAppConfigs = [
+    { appCode: 'APP-2026-UP01', instIdx: 21, status: 'SCHEDULED' as const, route: 'LMO' as const },
+    { appCode: 'APP-2026-UP02', instIdx: 24, status: 'SUBMITTED' as const, route: null },
+  ];
+  for (const cfg of upAppConfigs) {
+    const inst = seededInstruments[cfg.instIdx];
+    let app = await orm.Application.where({ applicationCode: cfg.appCode }).first();
+    if (!app) {
+      app = await orm.Application.create({
+        applicationCode: cfg.appCode,
+        instrumentId: inst.id,
+        type: 'INITIAL_VERIFICATION',
+        status: cfg.status,
+        route: cfg.route,
+        priority: 'MEDIUM',
+        submittedAt: '2026-08-01T10:00:00.000Z',
+      });
+
+      await orm.ApplicationStatusHistory.create({
+        applicationId: app.id,
+        fromStatus: null,
+        toStatus: cfg.status,
+        reason: 'Seeded Lucknow application state',
+      });
+    }
+
+    if (cfg.route === 'LMO' && cfg.status === 'SCHEDULED') {
+      let wo = await orm.WorkOrder.where({ applicationId: app.id }).first();
+      if (!wo) {
+        wo = await orm.WorkOrder.create({
+          applicationId: app.id,
+          route: cfg.route,
+          lmoId: seededLmos[6].lmo.id,
+          gatcId: null,
+          assignedById: sysAdmin.id,
+          assignedAt: '2026-08-05T10:00:00.000Z',
+          scheduledStartAt: '2026-09-15T09:00:00.000Z',
+          scheduledEndAt: '2026-09-15T12:00:00.000Z',
+          location: inst.address,
+        });
+      }
+    }
+  }
+
   // 11. Sample Notifications & Audit Log
   console.log('🔔 Seeding initial notifications and audit records...');
   const ownerUser = seededBusinesses[0].user;
@@ -913,11 +1132,11 @@ export async function main() {
 
   console.log('✅ Seed completed successfully!');
   console.log('📊 Summary:');
-  console.log(`- 5 Businesses: ${seededBusinesses.map(b => b.business.businessName).join(', ')}`);
-  console.log(`- 20 Instruments created`);
-  console.log(`- 18 Applications created across all lifecycle stages`);
-  console.log(`- 6 LMOs provisioned with jurisdictions and category expertise`);
-  console.log(`- 3 GATCs provisioned with staff, service areas, and authorizations`);
+  console.log(`- ${seededBusinesses.length} Businesses: ${seededBusinesses.map(b => b.business.businessName).join(', ')}`);
+  console.log(`- ${seededInstruments.length} Instruments created`);
+  console.log(`- 20 Applications created across all lifecycle stages`);
+  console.log(`- ${seededLmos.length} LMOs provisioned with jurisdictions and category expertise`);
+  console.log(`- ${seededGatcs.length} GATCs provisioned with staff, service areas, and authorizations`);
   console.log(`- 10 Certificates (3 Expired, 4 Expiring Soon, 3 Active)`);
   console.log(`- Default Demo Password for all accounts: ${DEMO_PASSWORD}`);
 

@@ -6,6 +6,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
 import { toIsoDateTime } from "@/lib/format";
+import { ACCURACY_CLASSES } from "@/lib/accuracy-classes";
 import { Button } from "@/components/ui/button";
 import { FileUpload } from "@/components/file-upload";
 import type { AttachmentOutput } from "@/modules/files/schema";
@@ -217,7 +218,12 @@ export function InstrumentRegisterSection() {
               <input className={inputClass} value={form.capacity} onChange={(e) => set("capacity", e.target.value)} placeholder="e.g. 30" required />
             </Field>
             <Field label="Accuracy class">
-              <input className={inputClass} value={form.accuracyClass} onChange={(e) => set("accuracyClass", e.target.value)} placeholder="e.g. Class III" required />
+              <select className={selectClass} value={form.accuracyClass} onChange={(e) => set("accuracyClass", e.target.value)} required>
+                <option value="">Select class…</option>
+                {ACCURACY_CLASSES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </Field>
             <Field label="Year of manufacture" optional>
               <input className={inputClass} type="number" value={form.yearOfManufacture} onChange={(e) => set("yearOfManufacture", e.target.value)} />

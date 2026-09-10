@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
 import { Field, inputClass, toDatetimeLocal, fromDatetimeLocal } from "../field";
+import { ACCURACY_CLASSES } from "@/lib/accuracy-classes";
 import type { RegulatoryRuleOutput } from "../../schema";
 
 interface FormState {
@@ -155,7 +156,12 @@ function RegulatoryRulesContent() {
               </Field>
             )}
             <Field label="Accuracy class">
-              <input className={inputClass} value={form.accuracyClass} onChange={(e) => setForm({ ...form, accuracyClass: e.target.value })} required />
+              <select className={inputClass} value={form.accuracyClass} onChange={(e) => setForm({ ...form, accuracyClass: e.target.value })} required>
+                <option value="">Select class…</option>
+                {ACCURACY_CLASSES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </Field>
             <Field label="Capacity min">
               <input className={inputClass} value={form.capacityMin} onChange={(e) => setForm({ ...form, capacityMin: e.target.value })} required />

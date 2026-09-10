@@ -148,7 +148,7 @@ function FieldApplicationDetailContent({ id }: { id: string }) {
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-semibold">Documents</h2>
-        <AttachmentList target={{ applicationId: id }} emptyTitle="No documents uploaded" />
+        <AttachmentList target={{ instrumentId: instrument.id }} emptyTitle="No documents uploaded" />
       </section>
 
       <section className="flex flex-col gap-2">

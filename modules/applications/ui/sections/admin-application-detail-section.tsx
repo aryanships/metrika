@@ -107,7 +107,6 @@ function AdminApplicationDetailContent({ id }: { id: string }) {
   const recommendedRoute = recommendQuery.data?.recommendedRoute;
 
   const reviewable = status === "SUBMITTED" || status === "UNDER_REVIEW";
-  const assignee = workOrder ? candidates.find((c) => c.candidateId === (workOrder.lmoId ?? workOrder.gatcId)) : undefined;
 
   return (
     <div className="flex flex-col gap-6">
@@ -176,8 +175,7 @@ function AdminApplicationDetailContent({ id }: { id: string }) {
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-semibold">Documents & photos</h2>
-        <AttachmentList target={{ applicationId: id }} emptyTitle="No application documents" />
-        <AttachmentList target={{ instrumentId: instrument.id }} emptyTitle="No instrument attachments" />
+        <AttachmentList target={{ instrumentId: instrument.id }} emptyTitle="No documents uploaded" />
       </section>
 
       <section className="flex flex-col gap-2">
@@ -308,7 +306,7 @@ function AdminApplicationDetailContent({ id }: { id: string }) {
           {workOrder && (
             <div className="flex flex-col gap-3 border-t border-border pt-3">
               <p className="text-sm text-muted-foreground">
-                Assigned to <span className="font-medium text-foreground">{assignee?.name ?? workOrder.route}</span>
+                Assigned to <span className="font-medium text-foreground">{workOrder.assigneeName ?? workOrder.route}</span>
                 {workOrder.wasOverridden && <span className="ml-2 text-amber-600 dark:text-amber-400">(overridden)</span>}
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -355,6 +353,9 @@ function AdminApplicationDetailContent({ id }: { id: string }) {
               ? `${formatDateTime(workOrder.scheduledStartAt)} — ${formatDateTime(workOrder.scheduledEndAt)}`
               : "Awaiting confirmation"}
           </p>
+          {workOrder.assigneeName && (
+            <p className="text-xs text-muted-foreground">Assigned to {workOrder.assigneeName}</p>
+          )}
           {workOrder.location && <p className="text-xs text-muted-foreground">{workOrder.location}</p>}
         </div>
       )}

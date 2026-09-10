@@ -3,6 +3,7 @@ import { ORPCError } from "@orpc/server";
 import { db } from "@/prisma/db";
 import { paginationMeta } from "@/schemas/shared";
 import { adminInstrumentIds } from "@/lib/scope";
+import { unitPathNames, type UnitPath } from "@/lib/geo";
 import type { AppUser } from "@/middleware/context";
 import {
   CreateInstrumentInput,
@@ -53,6 +54,7 @@ function toOutput(
   row: NonNullable<InstrumentRow>,
   type: { name: string; unit: string } | null,
   unit: { name: string } | null,
+  path?: UnitPath,
 ): InstrumentOutput {
   return {
     id: row.id,
@@ -72,6 +74,10 @@ function toOutput(
     address: row.address,
     administrativeUnitId: row.administrativeUnitId,
     administrativeUnitName: unit?.name ?? "",
+    stateName: path?.state ?? null,
+    districtName: path?.district ?? null,
+    tehsilName: path?.tehsil ?? null,
+    villageName: path?.village ?? null,
     postalCode: row.postalCode,
     latitude: row.latitude,
     longitude: row.longitude,
@@ -80,17 +86,13 @@ function toOutput(
   };
 }
 
-async function resolveRefs(orm: Orm, instrumentTypeId: string, administrativeUnitId: string) {
-  const [type, unit] = await Promise.all([
-    orm.InstrumentType.first({ id: instrumentTypeId }),
-    orm.AdministrativeUnit.first({ id: administrativeUnitId }),
-  ]);
-  return { type, unit };
-}
-
 async function toEnrichedOutput(orm: Orm, row: NonNullable<InstrumentRow>): Promise<InstrumentOutput> {
-  const { type, unit } = await resolveRefs(orm, row.instrumentTypeId, row.administrativeUnitId);
-  return toOutput(row, type, unit);
+  const [type, unit, path] = await Promise.all([
+    orm.InstrumentType.first({ id: row.instrumentTypeId }),
+    orm.AdministrativeUnit.first({ id: row.administrativeUnitId }),
+    unitPathNames(row.administrativeUnitId),
+  ]);
+  return toOutput(row, type, unit, path);
 }
 
 export const instrumentsService = {

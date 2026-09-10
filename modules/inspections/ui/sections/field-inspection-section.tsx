@@ -452,7 +452,9 @@ function InspectionForm({ inspection, applicationId }: { inspection: InspectionO
 
 export function FieldInspectionSection({ applicationId }: { applicationId: string }) {
   const queryClient = useQueryClient();
-  const query = useQuery(orpc.inspections.get.queryOptions({ input: { applicationId } }));
+  const query = useQuery(
+    orpc.inspections.get.queryOptions({ input: { applicationId }, retry: false }),
+  );
 
   const start = useMutation(
     orpc.inspections.start.mutationOptions({

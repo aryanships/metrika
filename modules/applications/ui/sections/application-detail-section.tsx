@@ -88,7 +88,7 @@ function ApplicationDetailContent({ id }: { id: string }) {
     }),
   );
 
-  const { application, statusHistory, completeness } = data;
+  const { application, statusHistory, completeness, instrument, appointment } = data;
   const status = application.status;
   const editable = EDITABLE_STATUSES.includes(status);
   const cancellable = CANCELLABLE_STATUSES.includes(status);
@@ -152,6 +152,79 @@ function ApplicationDetailContent({ id }: { id: string }) {
           <dd className="text-sm">{application.submittedAt ? formatDateTime(application.submittedAt) : "—"}</dd>
         </div>
       </dl>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold">Instrument &amp; installation</h2>
+        <dl className="grid gap-4 rounded-lg border border-border bg-card p-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="flex flex-col gap-0.5">
+            <dt className="text-xs text-muted-foreground">Type</dt>
+            <dd className="text-sm">{instrument.instrumentTypeName}</dd>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <dt className="text-xs text-muted-foreground">Manufacturer / Model</dt>
+            <dd className="text-sm">{instrument.manufacturer} {instrument.model}</dd>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <dt className="text-xs text-muted-foreground">Serial number</dt>
+            <dd className="text-sm">{instrument.serialNumber}</dd>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <dt className="text-xs text-muted-foreground">Capacity</dt>
+            <dd className="text-sm">{instrument.capacity ? `${instrument.capacity} ${instrument.instrumentTypeUnit}` : "—"}</dd>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <dt className="text-xs text-muted-foreground">Accuracy class</dt>
+            <dd className="text-sm">{instrument.accuracyClass ?? "—"}</dd>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <dt className="text-xs text-muted-foreground">Installed address</dt>
+            <dd className="text-sm">{instrument.address}</dd>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <dt className="text-xs text-muted-foreground">State</dt>
+            <dd className="text-sm">{instrument.stateName ?? "—"}</dd>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <dt className="text-xs text-muted-foreground">District</dt>
+            <dd className="text-sm">{instrument.districtName ?? "—"}</dd>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <dt className="text-xs text-muted-foreground">Tehsil</dt>
+            <dd className="text-sm">{instrument.tehsilName ?? "—"}</dd>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <dt className="text-xs text-muted-foreground">Village / Town</dt>
+            <dd className="text-sm">{instrument.villageName ?? "—"}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold">Verification schedule</h2>
+        <div className="rounded-lg border border-border bg-card p-4">
+          {appointment.assigneeName || appointment.scheduledStartAt ? (
+            <div className="flex flex-col gap-0.5 text-sm">
+              {appointment.assigneeName && (
+                <p>
+                  Assigned to <span className="font-medium">{appointment.assigneeName}</span>
+                </p>
+              )}
+              {appointment.scheduledStartAt && (
+                <p>
+                  Scheduled for{" "}
+                  <span className="font-medium">{formatDateTime(appointment.scheduledStartAt)}</span>
+                  {appointment.scheduledEndAt ? ` — ${formatDateTime(appointment.scheduledEndAt)}` : ""}
+                </p>
+              )}
+              {appointment.location && (
+                <p className="text-xs text-muted-foreground">Location: {appointment.location}</p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Not scheduled yet.</p>
+          )}
+        </div>
+      </section>
 
       {status === "DOCUMENTS_REQUIRED" && latestReason && (
         <div className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">

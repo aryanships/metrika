@@ -3,6 +3,7 @@ import { db } from "@/prisma/db";
 import { paginationMeta } from "@/schemas/shared";
 import { requireStateScope } from "@/middleware/require-state-scope";
 import { ancestorUnitIds, descendantUnitIds } from "@/lib/geo";
+import { resolveAssigneeName } from "@/lib/assignee";
 import { notifyBusinessOwner, notifyWorkOrderAssignees } from "@/lib/notify";
 import { distanceBetween, scoreBreakdown } from "./scoring";
 import { assertTransition } from "@/modules/applications/server/state-machine";
@@ -49,13 +50,14 @@ function formatWindow(iso: string): string {
   return new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 }
 
-function toWorkOrderOutput(row: WorkOrderRow): WorkOrderOutput {
+async function toWorkOrderOutput(row: WorkOrderRow): Promise<WorkOrderOutput> {
   return {
     id: row.id,
     applicationId: row.applicationId,
     route: row.route,
     lmoId: row.lmoId,
     gatcId: row.gatcId,
+    assigneeName: await resolveAssigneeName(row.route, row.lmoId, row.gatcId),
     recommendedScore: row.recommendedScore,
     wasOverridden: row.wasOverridden,
     assignedById: row.assignedById,
@@ -283,7 +285,7 @@ export const schedulingService = {
       return workOrder;
     });
 
-    return toWorkOrderOutput(created);
+    return await toWorkOrderOutput(created);
   },
 
   async schedule(input: ScheduleAppointmentInput, user: AppUser): Promise<WorkOrderOutput> {
@@ -350,7 +352,7 @@ export const schedulingService = {
       extra: { applicationId: application.id },
     });
 
-    return toWorkOrderOutput(updated!);
+    return await toWorkOrderOutput(updated!);
   },
 
   async listWorkOrders(input: ListWorkOrdersInput, user: AppUser): Promise<ListWorkOrdersOutput> {
@@ -382,7 +384,7 @@ export const schedulingService = {
       query.aggregate((agg) => ({ total: agg.count() })),
     ]);
 
-    return { items: rows.map(toWorkOrderOutput), pagination: paginationMeta(totals.total, page, limit) };
+    return { items: await Promise.all(rows.map(toWorkOrderOutput)), pagination: paginationMeta(totals.total, page, limit) };
   },
 };
 
