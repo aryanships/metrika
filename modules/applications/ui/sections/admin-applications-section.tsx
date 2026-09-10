@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { formatDate } from "@/lib/format";
@@ -53,10 +54,16 @@ function humanize(value: string): string {
 }
 
 export function AdminApplicationsSection() {
-  const [status, setStatus] = useState("");
-  const [type, setType] = useState("");
-  const [priority, setPriority] = useState("");
-  const [districtId, setDistrictId] = useState("");
+  const searchParams = useSearchParams();
+  const initialStatus = searchParams.get("status") ?? "";
+  const initialType = searchParams.get("type") ?? "";
+  const initialPriority = searchParams.get("priority") ?? "";
+  const initialDistrictId = searchParams.get("districtId") ?? "";
+
+  const [status, setStatus] = useState(initialStatus);
+  const [type, setType] = useState(initialType);
+  const [priority, setPriority] = useState(initialPriority);
+  const [districtId, setDistrictId] = useState(initialDistrictId);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(1);
 

@@ -1,4 +1,5 @@
-import { AdminApplicationsSection } from "../sections/admin-applications-section";
+import { Suspense } from "react";
+import { AdminApplicationsSection, AdminApplicationsSkeleton } from "../sections/admin-applications-section";
 
 export function AdminApplicationsView() {
   return (
@@ -7,7 +8,9 @@ export function AdminApplicationsView() {
         <h1 className="text-2xl font-bold">Review queue</h1>
         <p className="text-sm text-muted-foreground">Filter and process submitted verification applications.</p>
       </header>
-      <AdminApplicationsSection />
+      <Suspense fallback={<AdminApplicationsSkeleton />}>
+        <AdminApplicationsSection />
+      </Suspense>
     </div>
   );
 }

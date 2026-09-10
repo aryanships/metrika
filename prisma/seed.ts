@@ -341,9 +341,9 @@ export async function main() {
     });
 
     const ewbItems = [
-      { code: 'ITEM-ZERO', label: 'Zero Load Error Check', kind: 'NUMERIC' as const, unit: 'kg', order: 1 },
+      { code: 'ITEM-ZERO', label: 'Zero Load Error Check', kind: 'MEASUREMENT' as const, unit: 'kg', order: 1 },
       { code: 'ITEM-ECCENTRIC', label: 'Eccentricity (Corner Load) Test', kind: 'CHECKLIST' as const, unit: null, order: 2 },
-      { code: 'ITEM-MAXCAP', label: 'Max Capacity Indication Accuracy', kind: 'NUMERIC' as const, unit: 'kg', order: 3 },
+      { code: 'ITEM-MAXCAP', label: 'Max Capacity Indication Accuracy', kind: 'MEASUREMENT' as const, unit: 'kg', order: 3 },
       { code: 'ITEM-STAMP', label: 'Verification Stamp & Plaque Intact', kind: 'CHECKLIST' as const, unit: null, order: 4 },
     ];
     for (const it of ewbItems) {
@@ -373,8 +373,8 @@ export async function main() {
     });
 
     const fdpItems = [
-      { code: 'ITEM-MAXFLOW', label: 'Delivery Accuracy at Maximum Flow Rate', kind: 'NUMERIC' as const, unit: 'litre', order: 1 },
-      { code: 'ITEM-MINFLOW', label: 'Delivery Accuracy at Minimum Flow Rate', kind: 'NUMERIC' as const, unit: 'litre', order: 2 },
+      { code: 'ITEM-MAXFLOW', label: 'Delivery Accuracy at Maximum Flow Rate', kind: 'MEASUREMENT' as const, unit: 'litre', order: 1 },
+      { code: 'ITEM-MINFLOW', label: 'Delivery Accuracy at Minimum Flow Rate', kind: 'MEASUREMENT' as const, unit: 'litre', order: 2 },
       { code: 'ITEM-ANTIDRAIN', label: 'Anti-drain Valve Operation', kind: 'CHECKLIST' as const, unit: null, order: 3 },
       { code: 'ITEM-TOTALIZER', label: 'Totalizer Reading Verification', kind: 'CHECKLIST' as const, unit: null, order: 4 },
     ];
@@ -399,9 +399,9 @@ export async function main() {
       code: 'TPL-WBR-01',
       name: 'Heavy Weighbridge Verification Inspection',
       items: [
-        { code: 'ITEM-ZERO', label: 'Zero Load / Tare Error Check', kind: 'NUMERIC' as const, unit: 'tonne', order: 1 },
+        { code: 'ITEM-ZERO', label: 'Zero Load / Tare Error Check', kind: 'MEASUREMENT' as const, unit: 'tonne', order: 1 },
         { code: 'ITEM-CORNER', label: 'Corner Load (Section) Test', kind: 'CHECKLIST' as const, unit: null, order: 2 },
-        { code: 'ITEM-MAXCAP', label: 'Max Capacity Indication Accuracy', kind: 'NUMERIC' as const, unit: 'tonne', order: 3 },
+        { code: 'ITEM-MAXCAP', label: 'Max Capacity Indication Accuracy', kind: 'MEASUREMENT' as const, unit: 'tonne', order: 3 },
         { code: 'ITEM-PLATFORM', label: 'Platform / Foundation Condition', kind: 'CHECKLIST' as const, unit: null, order: 4 },
         { code: 'ITEM-STAMP', label: 'Verification Stamp & Plaque Intact', kind: 'CHECKLIST' as const, unit: null, order: 5 },
       ],

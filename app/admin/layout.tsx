@@ -13,12 +13,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   const links = [
-    { href: "/admin", label: "Dashboard" },
-    { href: "/admin/applications", label: "Applications" },
-    { href: "/admin/lmos", label: "LMOs" },
-    { href: "/admin/gatcs", label: "GATCs" },
-    { href: "/admin/certificates", label: "Certificates" },
-    { href: "/admin/audit", label: "Audit log" },
+    { href: "/admin", label: "Dashboard", icon: "dashboard" },
+    { href: "/admin/applications", label: "Applications", icon: "applications" },
+    { href: "/admin/lmos", label: "LMOs", icon: "lmos" },
+    { href: "/admin/gatcs", label: "GATCs", icon: "gatcs" },
+    { href: "/admin/certificates", label: "Certificates", icon: "certificates" },
+    { href: "/admin/audit", label: "Audit log", icon: "audit" },
   ];
 
   return (
