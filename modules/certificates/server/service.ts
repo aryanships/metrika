@@ -314,7 +314,9 @@ export const certificatesService = {
       db.orm.public.Business.first({ id: instrument.businessId }),
     ]);
 
-    const verifiedAt = inspection.finalizedAt ?? new Date().toISOString();
+    const verifiedAt = inspection.finalizedAt
+      ? new Date(inspection.finalizedAt).toISOString()
+      : new Date().toISOString();
     const validUntil = addMonths(verifiedAt, rule?.verificationPeriodMonths ?? 12);
     const issuingAuthority = await issuingAuthorityFor(instrument.administrativeUnitId);
 

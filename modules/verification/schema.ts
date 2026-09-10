@@ -21,6 +21,7 @@ export const PublicVerificationOutputSchema = z.object({
   verifiedAt: z.string(),
   validUntil: z.string(),
   issuingAuthority: z.string(),
+  businessName: z.string(),
   instrument: z.object({
     code: z.string(),
     category: z.string(),

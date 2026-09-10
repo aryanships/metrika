@@ -85,6 +85,7 @@ export default async function VerifyCertificatePage({ params }: { params: Promis
         <dl className="grid gap-x-6 gap-y-4 px-6 py-6 sm:grid-cols-2">
           <Field label="Certificate" value={result.certificateCode} mono />
           <Field label="Status" value={result.status} />
+          <Field label="Business / Owner" value={result.businessName} />
           <Field label="Instrument" value={result.instrument.code} mono />
           <Field label="Category" value={result.instrument.category} />
           <Field label="Manufacturer" value={result.instrument.manufacturer} />

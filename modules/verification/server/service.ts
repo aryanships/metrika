@@ -100,6 +100,7 @@ export const verificationService = {
       verifiedAt: certificate.verifiedAt,
       validUntil: certificate.validUntil,
       issuingAuthority,
+      businessName: business?.businessName ?? "",
       instrument: {
         code: instrument?.instrumentCode ?? "",
         category: type?.name ?? "",
