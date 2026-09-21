@@ -199,8 +199,8 @@ export function InstrumentRegisterSection() {
               <select className={selectClass} value={form.instrumentTypeId} onChange={(e) => set("instrumentTypeId", e.target.value)} required>
                 <option value="">Select type…</option>
                 {(typesQuery.data?.items ?? []).map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} ({t.unit})
+                  <option key={t.id} value={t.id} disabled={!t.ready}>
+                    {t.name} ({t.unit}){t.ready ? "" : " — not verifiable"}
                   </option>
                 ))}
               </select>
@@ -300,7 +300,10 @@ export function InstrumentRegisterSection() {
           <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-800 dark:text-emerald-300">
             <p className="font-semibold">Instrument Registered Successfully</p>
             <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-400">
-              Photos and documents are optional — you can upload them now or add them later from the instrument passport.
+              Next step: submit a verification application so your instrument can be inspected and certified.
+            </p>
+            <p className="mt-0.5 text-xs text-emerald-700/80 dark:text-emerald-400/80">
+              Photos and documents are optional — upload now or later from the instrument passport.
             </p>
           </div>
 
@@ -346,13 +349,13 @@ export function InstrumentRegisterSection() {
           <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
             <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
             <Button
-              variant="ghost"
+              variant="outline"
               onClick={() => { router.push(`/business/instruments/${createdId}`); router.refresh(); }}
             >
-              Skip for now
-            </Button>
-            <Button onClick={() => { router.push(`/business/instruments/${createdId}`); router.refresh(); }}>
               View digital passport
+            </Button>
+            <Button onClick={() => { router.push(`/business/applications/new?instrumentId=${createdId}&type=INITIAL_VERIFICATION`); router.refresh(); }}>
+              Submit verification application
             </Button>
           </div>
         </div>

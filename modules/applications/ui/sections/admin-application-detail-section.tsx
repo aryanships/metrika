@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
@@ -9,8 +10,10 @@ import { QueryErrorBoundary } from "@/components/query-error-boundary";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { AttachmentList } from "@/components/attachment-list";
+import { StatusStepper } from "@/components/status-stepper";
 import { ApplicationStatusBadge } from "../components/application-status-badge";
 import type { Priority } from "../../schema";
+import type { CertificateOutput } from "@/modules/certificates/schema";
 
 const inputClass =
   "flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30";
@@ -22,6 +25,28 @@ const PRIORITIES: Priority[] = ["LOW", "MEDIUM", "HIGH"];
 
 function humanize(value: string): string {
   return value.toLowerCase().replaceAll("_", " ");
+}
+
+const ADMIN_JOURNEY = ["Review", "Approve", "Schedule", "Inspect", "Certify"];
+
+function adminJourneyIndex(status: string): number | null {
+  switch (status) {
+    case "SUBMITTED":
+      return 0;
+    case "UNDER_REVIEW":
+      return 1;
+    case "APPROVED":
+      return 2;
+    case "SCHEDULED":
+    case "VERIFICATION_IN_PROGRESS":
+      return 3;
+    case "PASSED":
+      return 4;
+    case "CERTIFICATE_GENERATED":
+      return 5;
+    default:
+      return null;
+  }
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -66,6 +91,7 @@ function AdminApplicationDetailContent({ id }: { id: string }) {
   const [endAt, setEndAt] = useState("");
   const [location, setLocation] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [issuedCertificate, setIssuedCertificate] = useState<CertificateOutput | null>(null);
 
   const { data } = useSuspenseQuery(orpc.applications.detail.queryOptions({ input: { id } }));
   const workOrdersQuery = useQuery(
@@ -91,6 +117,16 @@ function AdminApplicationDetailContent({ id }: { id: string }) {
   const assign = useMutation(orpc.scheduling.assign.mutationOptions({ onSuccess: invalidate }));
   const schedule = useMutation(orpc.scheduling.schedule.mutationOptions({ onSuccess: invalidate }));
 
+  const issueCertificate = useMutation(
+    orpc.certificates.issue.mutationOptions({
+      onSuccess: (cert) => {
+        setIssuedCertificate(cert);
+        queryClient.invalidateQueries({ queryKey: orpc.applications.key() });
+        queryClient.invalidateQueries({ queryKey: orpc.certificates.key() });
+      },
+    }),
+  );
+
   async function run(fn: () => Promise<unknown>) {
     setError(null);
     try {
@@ -102,6 +138,7 @@ function AdminApplicationDetailContent({ id }: { id: string }) {
 
   const { application, instrument, businessName, statusHistory, completeness } = data;
   const status = application.status;
+  const jIdx = adminJourneyIndex(status);
   const workOrder = workOrdersQuery.data?.items[0];
   const candidates = recommendQuery.data?.candidates ?? [];
   const recommendedRoute = recommendQuery.data?.recommendedRoute;
@@ -119,6 +156,14 @@ function AdminApplicationDetailContent({ id }: { id: string }) {
           <span className="capitalize">{humanize(application.type)}</span> · {businessName} · {instrument.instrumentCode}
         </p>
       </header>
+
+      {jIdx !== null && (
+        <div className="rounded-lg border border-border bg-card p-3">
+          <StatusStepper
+            steps={ADMIN_JOURNEY.map((label, i) => ({ label, done: i < jIdx, current: i === jIdx }))}
+          />
+        </div>
+      )}
 
       {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
 
@@ -357,6 +402,39 @@ function AdminApplicationDetailContent({ id }: { id: string }) {
             <p className="text-xs text-muted-foreground">Assigned to {workOrder.assigneeName}</p>
           )}
           {workOrder.location && <p className="text-xs text-muted-foreground">{workOrder.location}</p>}
+        </div>
+      )}
+
+      {status === "PASSED" && (
+        <div className="flex flex-col gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+          <h2 className="text-sm font-semibold">Issue certificate</h2>
+          <p className="text-xs text-muted-foreground">
+            The inspection passed. Issue the certificate to complete this application and notify the owner.
+          </p>
+          {issuedCertificate ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-emerald-700 dark:text-emerald-400">
+                Certificate <span className="font-mono">{issuedCertificate.certificateCode}</span> issued.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={`/cert/${encodeURIComponent(issuedCertificate.certificateCode)}`}
+                  className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/80"
+                >
+                  View public certificate
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-end">
+              <Button
+                disabled={issueCertificate.isPending}
+                onClick={() => run(() => issueCertificate.mutateAsync({ applicationId: id }))}
+              >
+                {issueCertificate.isPending ? "Issuing…" : "Issue certificate"}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { AttachmentList } from "@/components/attachment-list";
 import { FileUpload } from "@/components/file-upload";
+import { StatusStepper } from "@/components/status-stepper";
 import { ApplicationStatusBadge } from "../components/application-status-badge";
 import type { ApplicationStatus } from "../../schema";
 import type { AttachmentKind, AttachmentOutput } from "@/modules/files/schema";
@@ -23,6 +24,59 @@ const inputClass =
 
 function humanize(value: string): string {
   return value.toLowerCase().replaceAll("_", " ");
+}
+
+const JOURNEY = ["Submit", "Review", "Schedule", "Inspect", "Certify"];
+
+function journeyIndex(status: ApplicationStatus): number | null {
+  switch (status) {
+    case "DRAFT":
+    case "DOCUMENTS_REQUIRED":
+      return 0;
+    case "SUBMITTED":
+    case "UNDER_REVIEW":
+      return 1;
+    case "APPROVED":
+    case "SCHEDULED":
+      return 2;
+    case "VERIFICATION_IN_PROGRESS":
+      return 3;
+    case "PASSED":
+      return 4;
+    case "CERTIFICATE_GENERATED":
+      return 5;
+    default:
+      return null;
+  }
+}
+
+function whatHappensNext(status: ApplicationStatus): string | null {
+  switch (status) {
+    case "DRAFT":
+      return "Complete the checklist and submit to send your application for admin review.";
+    case "DOCUMENTS_REQUIRED":
+      return "Upload the requested corrections, then resubmit.";
+    case "SUBMITTED":
+      return "An administrator will review your application and notify you of the outcome.";
+    case "UNDER_REVIEW":
+      return "Your application is under review by the state/department administrator.";
+    case "APPROVED":
+      return "Approved — the administrator will assign an officer and schedule your inspection.";
+    case "SCHEDULED":
+      return "Your verification is scheduled. An officer will visit to inspect your instrument.";
+    case "VERIFICATION_IN_PROGRESS":
+      return "The officer is conducting the field verification now.";
+    case "PASSED":
+      return "Verification passed — your certificate is being issued.";
+    case "CERTIFICATE_GENERATED":
+      return "Certificate issued. View it under Certificates or scan the QR to verify publicly.";
+    case "REJECTED":
+      return "This application was rejected. Create a new application if needed.";
+    case "CANCELLED":
+      return "This application was cancelled.";
+    default:
+      return null;
+  }
 }
 
 export function ApplicationDetailSection({ id }: { id: string }) {
@@ -88,8 +142,11 @@ function ApplicationDetailContent({ id }: { id: string }) {
     }),
   );
 
-  const { application, statusHistory, completeness, instrument, appointment } = data;
+  const { application, statusHistory, completeness, instrument, appointment, priorCertificates } = data;
   const status = application.status;
+  const jIdx = journeyIndex(status);
+  const nextHint = whatHappensNext(status);
+  const issuedCertificate = status === "CERTIFICATE_GENERATED" ? priorCertificates[0] : undefined;
   const editable = EDITABLE_STATUSES.includes(status);
   const cancellable = CANCELLABLE_STATUSES.includes(status);
   const latestReason = [...statusHistory].reverse().find((h) => h.reason)?.reason;
@@ -127,6 +184,29 @@ function ApplicationDetailContent({ id }: { id: string }) {
           </Link>
         </p>
       </header>
+
+      {jIdx !== null && (
+        <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-card p-3">
+          <StatusStepper
+            steps={JOURNEY.map((label, i) => ({ label, done: i < jIdx, current: i === jIdx }))}
+          />
+          {nextHint ? <p className="text-xs text-muted-foreground">{nextHint}</p> : null}
+        </div>
+      )}
+
+      {issuedCertificate && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+          <span className="text-sm text-emerald-700 dark:text-emerald-400">
+            Certificate <span className="font-mono">{issuedCertificate.certificateCode}</span> issued.
+          </span>
+          <Link
+            href={`/business/certificates/${issuedCertificate.id}`}
+            className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/80"
+          >
+            View certificate
+          </Link>
+        </div>
+      )}
 
       {actionError && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{actionError}</p>}
 

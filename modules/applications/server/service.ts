@@ -164,12 +164,14 @@ async function evaluateCompleteness(applicationId: string): Promise<Completeness
   if (!application) notFound(applicationId);
   const instrument = await loadInstrumentFor(application);
 
-  const [hasAttachment, hasCertificate, targetCertificate] = await Promise.all([
+  const [hasAttachment, hasCertificate, targetCertificate, typeTemplate, typeRule] = await Promise.all([
     db.orm.public.Attachment.where({ instrumentId: instrument.id }).first(),
     db.orm.public.Certificate.where({ instrumentId: instrument.id }).first(),
     application.targetCertificateId
       ? db.orm.public.Certificate.first({ id: application.targetCertificateId })
       : Promise.resolve(null),
+    db.orm.public.InspectionTemplate.where({ instrumentTypeId: instrument.instrumentTypeId, isActive: true }).first(),
+    db.orm.public.RegulatoryRule.where({ instrumentTypeId: instrument.instrumentTypeId }).first(),
   ]);
 
   const checks: CompletenessCheck[] = [];
@@ -184,6 +186,7 @@ async function evaluateCompleteness(applicationId: string): Promise<Completeness
   ];
   checks.push({ label: "Instrument information complete", passed: requiredFields.every(Boolean) });
   checks.push({ label: "Instrument is active", passed: instrument.status !== "INACTIVE" });
+  checks.push({ label: "Instrument type is verifiable (template and rules configured)", passed: !!typeTemplate && !!typeRule });
 
   const start = application.preferredStartAt;
   const end = application.preferredEndAt;

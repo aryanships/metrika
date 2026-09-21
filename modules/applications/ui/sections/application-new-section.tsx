@@ -42,6 +42,7 @@ export function ApplicationNewSection({
   const [error, setError] = useState<string | null>(null);
 
   const instrumentsQuery = useQuery(orpc.instruments.list.queryOptions({ input: { page: 1, limit: 100 } }));
+  const typesQuery = useQuery(orpc.masters.listInstrumentTypes.queryOptions({ input: { page: 1, limit: 100 } }));
   const certificatesQuery = useQuery(
     orpc.certificates.listMine.queryOptions({
       input: { page: 1, limit: 100, instrumentId },
@@ -70,6 +71,7 @@ export function ApplicationNewSection({
   }
 
   const instruments = instrumentsQuery.data?.items ?? [];
+  const readyByTypeId = new Map((typesQuery.data?.items ?? []).map((t) => [t.id, t.ready]));
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
@@ -114,12 +116,19 @@ export function ApplicationNewSection({
             <Label htmlFor="instrument">Instrument</Label>
             <select id="instrument" className={inputClass} value={instrumentId} onChange={(e) => setInstrumentId(e.target.value)} required>
               <option value="">Select instrument…</option>
-              {instruments.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.instrumentCode} — {i.instrumentTypeName} ({i.serialNumber})
-                </option>
-              ))}
+              {instruments.map((i) => {
+                const ready = readyByTypeId.get(i.instrumentTypeId);
+                return (
+                  <option key={i.id} value={i.id} disabled={ready === false}>
+                    {i.instrumentCode} — {i.instrumentTypeName} ({i.serialNumber})
+                    {ready === false ? " — not verifiable" : ""}
+                  </option>
+                );
+              })}
             </select>
+            <p className="text-xs text-muted-foreground">
+              Instruments whose type has no inspection template or rules are disabled — contact an administrator.
+            </p>
           </div>
 
           {NEEDS_TARGET_CERT.has(type) && (

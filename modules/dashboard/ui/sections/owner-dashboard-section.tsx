@@ -23,6 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { InstrumentStatusBadge } from "@/modules/instruments/ui/components/instrument-status-badge";
 import { CertificateStatusBadge } from "@/modules/certificates/ui/components/certificate-status-badge";
+import { NextStepCard } from "@/components/next-step";
+import { StatusStepper } from "@/components/status-stepper";
 import type { InstrumentStatus } from "@/modules/instruments/schema";
 import type { CertificateStatus } from "@/modules/certificates/schema";
 
@@ -113,6 +115,50 @@ function OwnerDashboardContent() {
   const expiring = owner?.certificatesByStatus["EXPIRING_SOON"] ?? 0;
   const needsReverification = expired + expiring > 0;
 
+  const totalInstruments = owner ? totalOf(owner.instrumentsByStatus) : 0;
+  const totalApplications = owner ? totalOf(owner.applicationsByStatus) : 0;
+  const totalCertificates = owner ? totalOf(owner.certificatesByStatus) : 0;
+  const stage = totalInstruments === 0 ? 0 : totalApplications === 0 ? 1 : totalCertificates === 0 ? 2 : 3;
+
+  const nextStep =
+    stage === 0
+      ? {
+          title: "Register your first instrument",
+          description: "Create a digital identity for a weighing or measuring instrument to begin verification.",
+          href: "/business/instruments/new",
+          ctaLabel: "Register instrument",
+          icon: <ScaleIcon className="size-5" />,
+        }
+      : stage === 1
+        ? {
+            title: "Apply for verification",
+            description: "Your instrument is registered. Submit a verification application to start the certification journey.",
+            href: "/business/applications/new",
+            ctaLabel: "New application",
+            icon: <ClipboardListIcon className="size-5" />,
+          }
+        : stage === 2
+          ? {
+              title: "Application in progress",
+              description: "Your verification application is being reviewed. Track its status and next milestone.",
+              href: "/business/applications",
+              ctaLabel: "Track applications",
+              icon: <ClipboardListIcon className="size-5" />,
+            }
+          : {
+              title: "Certificates issued",
+              description: "Your instruments are certified. Monitor expiry and renew before certificates lapse.",
+              href: "/business/certificates",
+              ctaLabel: "View certificates",
+              icon: <FileCheck2Icon className="size-5" />,
+            };
+
+  const stepperSteps = ["Register", "Apply", "Verify", "Certified"].map((label, i) => ({
+    label,
+    done: i < stage,
+    current: i === stage,
+  }));
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col justify-between gap-4 rounded-3xl border border-border bg-card p-6 shadow-sm md:flex-row md:items-center">
@@ -135,6 +181,17 @@ function OwnerDashboardContent() {
             Verify a certificate
           </Link>
         </div>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <NextStepCard
+          title={nextStep.title}
+          description={nextStep.description}
+          href={nextStep.href}
+          ctaLabel={nextStep.ctaLabel}
+          icon={nextStep.icon}
+        />
+        <StatusStepper steps={stepperSteps} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -51,6 +51,18 @@ function num(value: string): number {
   return Number(value);
 }
 
+/** A type is verifiable when it has an active inspection template and at least
+ * one regulatory rule. Orphan types (created without either) are surfaced as
+ * `ready: false` so the owner/admin UIs can gate on them instead of letting an
+ * application dead-end later. */
+async function instrumentTypeReady(instrumentTypeId: string): Promise<boolean> {
+  const [template, rule] = await Promise.all([
+    db.orm.public.InspectionTemplate.where({ instrumentTypeId, isActive: true }).first(),
+    db.orm.public.RegulatoryRule.where({ instrumentTypeId }).first(),
+  ]);
+  return !!template && !!rule;
+}
+
 /** Refuse a delete while any named reference still points at the row. */
 async function assertDeletable(refs: { label: string; check: () => Promise<unknown> }[]): Promise<void> {
   for (const { label, check } of refs) {
@@ -147,17 +159,21 @@ export const mastersService = {
   async listInstrumentTypes(input: ListInstrumentTypesInput): Promise<ListInstrumentTypesOutput> {
     const page = input.page ?? 1;
     const limit = input.limit ?? 20;
-    const [items, totals] = await Promise.all([
+    const [rows, totals] = await Promise.all([
       db.orm.public.InstrumentType.orderBy((t) => t.name.asc()).offset((page - 1) * limit).limit(limit).all(),
       db.orm.public.InstrumentType.aggregate((agg) => ({ total: agg.count() })),
     ]);
+    const items = await Promise.all(
+      rows.map(async (t) => ({ ...t, ready: await instrumentTypeReady(t.id) })),
+    );
     return { items, pagination: paginationMeta(totals.total, page, limit) };
   },
 
   async createInstrumentType(input: CreateInstrumentTypeInput): Promise<InstrumentTypeOutput> {
     const existing = await db.orm.public.InstrumentType.where({ code: input.code }).first();
     if (existing) conflict("code", "Instrument type code already exists");
-    return db.orm.public.InstrumentType.create({ code: input.code, name: input.name, unit: input.unit });
+    const created = await db.orm.public.InstrumentType.create({ code: input.code, name: input.name, unit: input.unit });
+    return { ...created, ready: false };
   },
 
   async updateInstrumentType(input: UpdateInstrumentTypeInput): Promise<InstrumentTypeOutput> {
@@ -175,7 +191,8 @@ export const mastersService = {
       name: input.name ?? existing.name,
       unit: input.unit ?? existing.unit,
     });
-    return (await db.orm.public.InstrumentType.first({ id: input.id }))!;
+    const updated = await db.orm.public.InstrumentType.first({ id: input.id });
+    return { ...updated!, ready: await instrumentTypeReady(input.id) };
   },
 
   async deleteInstrumentType(input: { id: string }): Promise<DeletedOutput> {

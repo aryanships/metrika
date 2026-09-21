@@ -58,7 +58,7 @@ function CertificateDetailContent({ id }: { id: string }) {
             <CertificateStatusBadge status={data.status} />
           </div>
         </div>
-        <div className="flex items-center gap-2 print:hidden">
+        <div className="flex flex-wrap items-center justify-end gap-2 print:hidden">
           {(data.status === "EXPIRED" || data.status === "EXPIRING_SOON") && (
             <Link
               href={`/business/applications/new?instrumentId=${data.instrumentId}&type=RE_VERIFICATION`}
@@ -67,12 +67,30 @@ function CertificateDetailContent({ id }: { id: string }) {
               Apply for re-verification
             </Link>
           )}
-          <button
-            onClick={() => window.print()}
+          <Link
+            href={`/business/applications/${data.applicationId}`}
             className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
           >
-            Print / Save PDF
-          </button>
+            View application
+          </Link>
+          <Link
+            href={`/business/instruments/${data.instrumentId}`}
+            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+          >
+            View instrument
+          </Link>
+          <Link
+            href={`/cert/${encodeURIComponent(data.certificateCode)}`}
+            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+          >
+            Public view
+          </Link>
+          <a
+            href={`/cert/${encodeURIComponent(data.certificateCode)}/pdf`}
+            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+          >
+            Download PDF
+          </a>
         </div>
       </header>
 

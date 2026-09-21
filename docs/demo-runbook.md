@@ -28,13 +28,14 @@ All accounts share the password **`Demo1234!`**.
 
 | Role | Email | Notes |
 | --- | --- | --- |
-| Instrument owner | `owner.reliance@retail.in` | Reliance Fresh Superstores (Pune) |
-| Instrument owner | `owner.bpcl@petro.in` | BPCL Fuel Oasis (Pune) |
-| State admin | `stateadmin.mh@metrika.gov.in` | Maharashtra scope |
-| District admin | `distadmin.pune@metrika.gov.in` | Pune scope |
+| Instrument owner | `owner.bigbazaar@retail.in` | Big Bazaar Jankipuram (Lucknow) |
+| Instrument owner | `owner.iocl@petro.in` | IOCL Fuel Station Aliganj (Lucknow) |
+| State admin | `stateadmin.up@metrika.gov.in` | Uttar Pradesh scope |
+| District admin | `distadmin.lucknow@metrika.gov.in` | Lucknow scope |
 | System admin | `admin@metrika.gov.in` | Full audit / master data |
-| LMO | `lmo.sharma@metrika.gov.in` | LMO-MH-001, Pune, EWB/FDP expertise |
-| GATC manager | `manager.apex@gatc.org` | Apex Metrology & Calibration Labs |
+| LMO | `lmo.verma@metrika.gov.in` | LMO-UP-001, Lucknow, EWB/FDP expertise |
+| LMO | `lmo.gupta@metrika.gov.in` | LMO-UP-002, Lucknow, WBR/EWB expertise |
+| GATC manager | `manager.avadh@gatc.org` | Avadh Testing & Calibration, Lucknow |
 
 ## 3. Feature route list
 
@@ -43,13 +44,15 @@ All accounts share the password **`Demo1234!`**.
 | `/login` | public | Email/password sign-in |
 | `/verify` | public | Certificate/instrument search |
 | `/verify/c/[code]` | public | QR destination: safe verification result |
-| `/owner` | owner | Dashboard: statuses, appointments, notifications, re-verification CTA |
-| `/owner/profile` | owner | Business profile |
-| `/owner/instruments` | owner | Instrument registry |
-| `/owner/instruments/new` | owner | Register instrument |
-| `/owner/instruments/[id]` | owner | Digital passport: overview + certificate/application history |
-| `/owner/certificates` | owner | Certificate list |
-| `/owner/certificates/[id]` | owner | Certificate + QR + print |
+| `/cert/[code]` | public | Public certificate view (printable) |
+| `/cert/[code]/pdf` | public | On-demand PDF download |
+| `/business` | owner | Dashboard: statuses, appointments, notifications, re-verification CTA |
+| `/business/profile` | owner | Business profile |
+| `/business/instruments` | owner | Instrument registry |
+| `/business/instruments/new` | owner | Register instrument |
+| `/business/instruments/[id]` | owner | Digital passport: overview + certificate/application history |
+| `/business/certificates` | owner | Certificate list |
+| `/business/certificates/[id]` | owner | Certificate + QR + print/PDF |
 | `/field` | LMO / GATC staff | Assigned / today / pending work |
 | `/admin` | state/district/system admin | Applications, certificates, districts, workload |
 | `/admin/audit` | admins | Append-only audit trail |
@@ -58,8 +61,8 @@ All accounts share the password **`Demo1234!`**.
 
 | Step | Action | Login | Route |
 | --- | --- | --- | --- |
-| 1 | Business logs in | owner | `/login` → `/owner` |
-| 2 | Registers an electronic weighing machine | owner | `/owner/instruments/new` |
+| 1 | Business logs in | owner | `/login` → `/business` |
+| 2 | Registers an electronic weighing machine | owner | `/business/instruments/new` |
 | 3 | Uploads documents | owner | instrument detail → upload |
 | 4 | Submits verification application | owner | application wizard |
 | 5 | Admin receives application | state admin | `/admin` |
@@ -74,9 +77,24 @@ All accounts share the password **`Demo1234!`**.
 | 14 | Certificate generated | admin/LMO | `certificates.issue` |
 | 15 | Judge scans QR | public | certificate page QR |
 | 16 | Public verification confirms authenticity | public | `/verify/c/[code]` |
-| 17 | Show instrument passport | owner | `/owner/instruments/[id]` |
-| 18 | Show certificate approaching expiry | owner | `/owner` notifications |
+| 17 | Show instrument passport | owner | `/business/instruments/[id]` |
+| 18 | Show certificate approaching expiry | owner | `/business` notifications |
 | 19 | Click re-verification | owner | re-verification CTA → new application |
+
+## 4a. Streamlined demo path (≤ 4 minutes)
+
+The product now guides every actor to a single next action. Follow one thread:
+
+1. **Landing** — narrate the "Register → Apply → Screen → Schedule → Verify → Certify → QR → Renew" lifecycle strip.
+2. **Owner login** (`owner.bigbazaar@retail.in`, 1-click shortcut).
+3. **Owner dashboard** — highlighted "next step" card + lifecycle stepper. Click **Register instrument**.
+4. **Register** — short form; the success screen offers **Submit verification application**.
+5. **Apply** — type/instrument preselected, evidence already attached → **Submit**. The detail page shows a "what happens next" stepper.
+6. **Admin login** (`stateadmin.up@metrika.gov.in`) — dashboard flags "N applications awaiting review". Open the application: **Start review → Approve → Assign → Confirm schedule** on one page with a stepper.
+7. **LMO login** (`lmo.verma@metrika.gov.in`) — dashboard card has a one-click **Start**. Record measurements → **Submit** (PASS).
+8. **Issue certificate** — from the PASSED application (admin or field), one click **Issue certificate** → **View public certificate**.
+9. **Public** — `/cert/[code]` shows a printable certificate with **Download PDF**; scan the QR to `/verify/c/[code]`.
+10. **Owner** — dashboard now shows the active certificate and re-verification CTA.
 
 ## 5. Automated checks
 
@@ -103,7 +121,8 @@ bun run scripts/expiry-sweep.ts             # certificate status + notifications
 
 ## 7. Known prototype boundaries
 
-- Certificate is a printable HTML page (no binary PDF/R2 round-trip); `Certificate.fileId` stays null.
+- Certificate PDF is generated on demand (`/cert/[code]/pdf`) from the live record;
+  `Certificate.fileId` stays null (no binary artifact stored in R2/local).
 - Re-verification / transfer / correction reuse `applications.createDraft` + completeness validation.
 - Maps (Leaflet), recommendation visualization, and Recharts dashboards are P1 and not yet wired.
 - The expiry sweep is a manual script; production moves it to a scheduled worker.

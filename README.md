@@ -39,7 +39,7 @@ development — uploads fall back to the local filesystem adapter
 
 | Role | Home route | Notes |
 | --- | --- | --- |
-| Instrument Owner / Business | `/owner` | self-registers, registers instruments, applies, tracks certificates |
+| Instrument Owner / Business | `/business` | self-registers, registers instruments, applies, tracks certificates |
 | LMO | `/field` | conducts field verification |
 | GATC manager / operator | `/field` | centre-scoped authority (no global role) |
 | State / District Admin | `/admin` | reviews, assigns, schedules, issues |
@@ -53,11 +53,11 @@ the full list).
 
 | Role | Email |
 | --- | --- |
-| Instrument owner | `owner.reliance@retail.in` |
-| State admin | `stateadmin.mh@metrika.gov.in` |
+| Instrument owner | `owner.bigbazaar@retail.in` |
+| State admin | `stateadmin.up@metrika.gov.in` |
 | System admin | `admin@metrika.gov.in` |
-| LMO | `lmo.sharma@metrika.gov.in` |
-| GATC manager | `manager.apex@gatc.org` |
+| LMO | `lmo.verma@metrika.gov.in` |
+| GATC manager | `manager.avadh@gatc.org` |
 
 ## Verification
 

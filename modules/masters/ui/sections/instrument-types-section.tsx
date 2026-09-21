@@ -7,6 +7,7 @@ import { describeError } from "@/lib/errors";
 import { QueryErrorBoundary } from "@/components/query-error-boundary";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/data-table";
 import { Field, inputClass } from "../field";
 import type { InstrumentTypeOutput } from "../../schema";
@@ -134,6 +135,19 @@ function InstrumentTypesContent() {
           { header: "Code", cell: (t) => <span className="font-mono text-xs">{t.code}</span> },
           { header: "Name", cell: (t) => <span className="font-medium">{t.name}</span> },
           { header: "Unit", cell: (t) => <span className="text-xs">{t.unit}</span> },
+          {
+            header: "Readiness",
+            cell: (t) =>
+              t.ready ? (
+                <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+                  Verifiable
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                  Needs template + rule
+                </Badge>
+              ),
+          },
           {
             header: "Actions",
             cell: (t) => (

@@ -171,24 +171,37 @@ function FieldDashboardContent() {
         </h2>
         {field && field.workOrders.length > 0 ? (
           <div className="flex flex-col gap-2">
-            {field.workOrders.map((w) => (
-              <Link
-                key={w.applicationId}
-                href={`/field/applications/${w.applicationId}`}
-                className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:border-ring"
-              >
-                <div className="flex flex-col gap-0.5">
-                  <span className="font-mono font-medium">{w.applicationCode}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {w.instrumentCode} · {w.instrumentType}
-                  </span>
+            {field.workOrders.map((w) => {
+              const status = w.status as ApplicationStatus;
+              const startable = status === "SCHEDULED" || status === "VERIFICATION_IN_PROGRESS";
+              return (
+                <div
+                  key={w.applicationId}
+                  className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:border-ring"
+                >
+                  <Link href={`/field/applications/${w.applicationId}`} className="flex min-w-0 flex-col gap-0.5">
+                    <span className="font-mono font-medium">{w.applicationCode}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {w.instrumentCode} · {w.instrumentType}
+                    </span>
+                  </Link>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-xs text-muted-foreground">{formatDate(w.scheduledStartAt)}</span>
+                      <ApplicationStatusBadge status={status} />
+                    </div>
+                    {startable && (
+                      <Link
+                        href={`/field/applications/${w.applicationId}/inspect`}
+                        className="rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/80"
+                      >
+                        {status === "VERIFICATION_IN_PROGRESS" ? "Resume" : "Start"}
+                      </Link>
+                    )}
+                  </div>
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-xs text-muted-foreground">{formatDate(w.scheduledStartAt)}</span>
-                  <ApplicationStatusBadge status={w.status as ApplicationStatus} />
-                </div>
-              </Link>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">No assigned work yet.</p>

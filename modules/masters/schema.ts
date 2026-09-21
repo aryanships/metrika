@@ -61,6 +61,7 @@ export const InstrumentTypeOutputSchema = z.object({
   code: z.string(),
   name: z.string(),
   unit: z.string(),
+  ready: z.boolean(),
 });
 export type InstrumentTypeOutput = z.infer<typeof InstrumentTypeOutputSchema>;
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-query";
 import { describeError } from "@/lib/errors";
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { FileUpload } from "@/components/file-upload";
 import type { InspectionOutput, ObservationSeverity } from "../../schema";
 import type { AttachmentKind, AttachmentOutput } from "@/modules/files/schema";
+import type { CertificateOutput } from "@/modules/certificates/schema";
 
 const inputClass =
   "flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30";
@@ -123,7 +125,22 @@ function calcDeviation(
 }
 
 function FinalizedView({ inspection }: { inspection: InspectionOutput }) {
+  const queryClient = useQueryClient();
   const pass = inspection.result === "PASS";
+  const [issued, setIssued] = useState<CertificateOutput | null>(null);
+  const [issueError, setIssueError] = useState<string | null>(null);
+
+  const issue = useMutation(
+    orpc.certificates.issue.mutationOptions({
+      onSuccess: (cert) => {
+        setIssued(cert);
+        queryClient.invalidateQueries({ queryKey: orpc.applications.key() });
+        queryClient.invalidateQueries({ queryKey: orpc.certificates.key() });
+      },
+      onError: (err) => setIssueError(describeError(err)),
+    }),
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
@@ -180,6 +197,38 @@ function FinalizedView({ inspection }: { inspection: InspectionOutput }) {
           </div>
         </section>
       )}
+
+      <section className="flex flex-wrap items-center gap-2">
+        {issueError && <p className="text-sm text-destructive">{issueError}</p>}
+        {pass && issued ? (
+          <>
+            <span className="text-sm text-emerald-700 dark:text-emerald-400">
+              Certificate <span className="font-mono">{issued.certificateCode}</span> issued.
+            </span>
+            <Link
+              href={`/cert/${encodeURIComponent(issued.certificateCode)}`}
+              className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/80"
+            >
+              View public certificate
+            </Link>
+          </>
+        ) : pass ? (
+          <Button
+            disabled={issue.isPending}
+            onClick={() => issue.mutate({ applicationId: inspection.applicationId })}
+          >
+            {issue.isPending ? "Issuing…" : "Issue certificate"}
+          </Button>
+        ) : (
+          <span className="text-sm text-muted-foreground">This verification did not pass.</span>
+        )}
+        <Link
+          href={`/field/applications/${inspection.applicationId}`}
+          className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+        >
+          View application
+        </Link>
+      </section>
     </div>
   );
 }
@@ -330,6 +379,13 @@ function InspectionForm({ inspection, applicationId }: { inspection: InspectionO
           {inspection.instrument.serialNumber}
         </p>
       </header>
+
+      {!inspection.template && (
+        <div className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
+          This instrument type has no inspection template configured. You can record measurements manually,
+          but contact an administrator to add a template for a structured verification.
+        </div>
+      )}
 
       {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
 

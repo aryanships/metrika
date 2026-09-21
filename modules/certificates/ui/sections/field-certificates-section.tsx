@@ -57,7 +57,7 @@ function FieldCertificatesContent() {
           </div>
           <div className="flex flex-col items-end gap-1">
             <CertificateStatusBadge status={c.status} />
-            <Link href={c.qrUrl} className="text-xs font-medium text-primary hover:underline">
+            <Link href={`/cert/${encodeURIComponent(c.certificateCode)}`} className="text-xs font-medium text-primary hover:underline">
               Public view
             </Link>
           </div>

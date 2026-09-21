@@ -87,9 +87,17 @@ function FieldApplicationDetailContent({ id }: { id: string }) {
         <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{describeError(issue.error)}</p>
       )}
       {issue.isSuccess && issue.data && (
-        <p className="rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400">
-          Certificate <span className="font-mono">{issue.data.certificateCode}</span> issued.
-        </p>
+        <div className="flex flex-wrap items-center gap-2 rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400">
+          <span>
+            Certificate <span className="font-mono">{issue.data.certificateCode}</span> issued.
+          </span>
+          <Link
+            href={`/cert/${encodeURIComponent(issue.data.certificateCode)}`}
+            className="font-medium underline underline-offset-2"
+          >
+            View public certificate
+          </Link>
+        </div>
       )}
 
       <section className="flex flex-col gap-2">

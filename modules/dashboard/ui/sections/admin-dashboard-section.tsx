@@ -21,6 +21,7 @@ import { QueryErrorBoundary } from "@/components/query-error-boundary";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { NextStepCard } from "@/components/next-step";
 import { ApplicationStatusBadge } from "@/modules/applications/ui/components/application-status-badge";
 import { CertificateStatusBadge } from "@/modules/certificates/ui/components/certificate-status-badge";
 import type { ApplicationStatus } from "@/modules/applications/schema";
@@ -132,6 +133,27 @@ function AdminDashboardContent() {
   const gatcOpenTotal = admin?.gatcWorkload.reduce((a, g) => a + g.open, 0) ?? 0;
   const openWorkload = lmoOpenTotal + gatcOpenTotal;
 
+  const submittedCount = admin?.applicationsByStatus.SUBMITTED ?? 0;
+  const passedCount = admin?.applicationsByStatus.PASSED ?? 0;
+  const nextAction =
+    submittedCount > 0
+      ? {
+          title: `${submittedCount} application${submittedCount === 1 ? "" : "s"} awaiting review`,
+          description: "Start reviewing newly submitted verification requests.",
+          href: "/admin/applications?status=SUBMITTED",
+          ctaLabel: "Review applications",
+          icon: <ClipboardListIcon className="size-5" />,
+        }
+      : passedCount > 0
+        ? {
+            title: `${passedCount} application${passedCount === 1 ? "" : "s"} passed, ready to certify`,
+            description: "Issue certificates for applications that passed inspection.",
+            href: "/admin/certificates",
+            ctaLabel: "Issue certificates",
+            icon: <CheckCircle2Icon className="size-5" />,
+          }
+        : null;
+
   return (
     <div className="flex flex-col gap-6">
       {/* Welcome & Admin Banner */}
@@ -171,6 +193,16 @@ function AdminDashboardContent() {
           </div>
         </div>
       </div>
+
+      {nextAction && (
+        <NextStepCard
+          title={nextAction.title}
+          description={nextAction.description}
+          href={nextAction.href}
+          ctaLabel={nextAction.ctaLabel}
+          icon={nextAction.icon}
+        />
+      )}
 
       {/* 4 Stat Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
